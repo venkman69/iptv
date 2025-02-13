@@ -1,0 +1,73 @@
+#!/bin/bash -x
+cd /home/venkman/git/iptv
+killpid(){
+    if [ -f .iptv.pid ]
+    then
+        psid=`cat .iptv.pid`
+        kill  $psid
+        if [ $? -eq 0 ]
+        then
+            echo "Process killed"
+            rm .iptv.pid
+        else
+            echo "Process did not die"
+            exit 1
+        fi
+    fi
+}
+checkpid(){
+    if [ -f .iptv.pid ]
+    then
+        psid=`cat .iptv.pid`
+        ps -p $psid >/dev/null
+        if [ $? -eq 0 ]
+        then
+            echo "Process is still running"
+            exit
+        fi
+    fi
+}
+createvenv(){
+    if [ ! -d venv ]
+    then
+        python3 -m venv venv
+    fi
+}
+rebuild() {
+    killpid
+    git pull
+    rm -rf venv
+    start
+}
+
+start(){
+
+    createvenv
+    checkpid
+    git pull
+    . ./venv/bin/activate
+    pip install -r requirements.txt
+    ./venv/bin/streamlit run iptv_downloader.py --server.port=8503 --server.headless true --server.enableCORS=false --server.baseUrlPath=/iptv &
+    echo $! > .iptv.pid
+
+}
+
+if [ "$1" = "stop" ]
+then
+    killpid
+    exit
+fi
+{
+    if [ "$1" = "restart" ]
+    then
+        killpid
+    fi
+    if [ "$1" = "rebuild" ]
+    then
+        rebuild
+    fi
+
+    start
+
+}>>rundash.log 2>&1
+
