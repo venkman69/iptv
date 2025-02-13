@@ -32,6 +32,8 @@ def download_file(target_file_name:str, url:str):
             chunk_count = 0
             for chunk in r.iter_content(chunk_size=8192):
                 chunk_count+=1
+                prog= chunk_count/chunks
+                if prog > 1: prog = 1
                 dl_bar.progress(chunk_count/chunks)
                 f.write(chunk)
             # shutil.copyfileobj(r.raw, f)
@@ -50,9 +52,8 @@ with st.sidebar:
         del st.session_state["media_list"]
     m3u_url = st.text_input("Enter the URL of the m3u file")
     if st.button("Download m3u file"):
-        with st.spinner("Downloading m3u file...", show_time=True):
-            download_file("vod.m3u", m3u_url)
-            del st.session_state["media_list"]
+        download_file("vod.m3u", m3u_url)
+        del st.session_state["media_list"]
         # with requests.get(m3u_url, stream=True,) as r:
         #     with open("vod.m3u", 'wb') as f:
         #         shutil.copyfileobj(r.raw, f)
