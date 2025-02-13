@@ -17,16 +17,9 @@ import shutil
 from util import *
 from streamlit_option_menu import option_menu   # pip install streamlit-option-menu
 
-def download_file(target_file_name:str, url:str):
-    #fake a file download
-    file_size = 1000000
-    st.write(f"Downloading {target_file_name} of size {file_size} bytes")
-    dl_bar=st.progress(0)
-    for i in range(file_size//10000):
-        dl_bar.progress(i*10000/file_size)
-        time.sleep(.01)
+VOD_FILE = "vod.m3u"
 
-def download_file_(target_file_name:str, url:str):
+def download_file(target_file_name:str, url:str):
     with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
         r.raise_for_status()
         file_size = r.headers["Content-Length"]
@@ -69,7 +62,7 @@ with st.sidebar:
 @st.cache_data(persist="disk", max_entries=1)
 def initialize(vod_file:str,vod_hash:str):
     print("reading m3u")
-    media_list:List[m3u] =read_m3u("vod.m3u")
+    media_list:List[m3u] =read_m3u(vod_file)
     groups = sorted(set(item.group for item in media_list if item.group is not None))
     languages = sorted(set(item.lang for item in media_list if item.lang is not None))
     return media_list, groups, languages
@@ -77,6 +70,9 @@ def initialize(vod_file:str,vod_hash:str):
 
 #get the sha256sum hash for vod.m3u
 if not "media_list" in st.session_state:
+    if not os.path.exists(VOD_FILE):
+        st.write("No m3u file found")
+        st.stop()
     with open("vod.m3u", "rb") as f:
         vod_hash = hashlib.file_digest(f,"sha256")
     media_list, groups, languages = initialize("vod.m3u",vod_hash.hexdigest())
