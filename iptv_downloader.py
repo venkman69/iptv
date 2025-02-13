@@ -34,7 +34,7 @@ def download_file(target_file_name:str, url:str):
                 chunk_count+=1
                 prog= chunk_count/chunks
                 if prog > 1: prog = 1
-                dl_bar.progress(chunk_count/chunks)
+                dl_bar.progress(prog)
                 f.write(chunk)
             # shutil.copyfileobj(r.raw, f)
 # show a pulldown menu with groups from media_list and for language and a search input text for title
