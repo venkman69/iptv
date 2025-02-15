@@ -4,3 +4,4 @@ pandas
 requests
 black
 ffmpeg
+pymediainfo

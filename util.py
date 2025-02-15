@@ -1,5 +1,88 @@
-import pprint
-import re
+import tempfile
+from pymediainfo import MediaInfo
+import requests
+
+class MyMediaInfo(object):
+    def __init__(self, media_info):
+        self.media_info = media_info
+        self.format = ""
+        self.duration = ""
+        self.file_size = ""
+        self.video_codec = ""
+        self.width = ""
+        self.height = ""
+        self.aspect_ratio = ""
+        self.language = ""
+        self.audio_channels = ""
+        self.subtitles = ""
+        self.resolution = ""
+
+        for track in media_info["tracks"]:
+            if track["track_type"] == 'General':
+                self.format = track.get("format")
+                self.duration = track.get("duration","0")
+                #convert duration seconds to hours and minutes
+                duration = int(self.duration)/1000 # convert to seconds
+                hours = duration // 3600
+                minutes = (duration % 3600) // 60
+                self.hour_minute = f"{hours}:{minutes}"
+                self.file_size = track.get("general_compliance","Element size -1").split()[2]
+                file_size = int(self.file_size)
+                if file_size == -1:
+                    self.human_file_size = "Not Found"
+                elif file_size < 1024:
+                    self.human_file_size = f"{file_size} B"
+                elif file_size < 1024**2:
+                    self.human_file_size = f"{file_size/1024:.2f} KB"
+                elif file_size < 1024**3:
+                    self.human_file_size = f"{file_size/1024**2:.2f} MB"
+                else:
+                    self.human_file_size = f"{file_size/1024**3:.2f} GB"
+
+            elif track["track_type"] == 'Video':
+                self.video_codec = track["internet_media_type"]
+                self.width = track["width"]
+                self.height = track["height"]
+                if self.width < 1080:
+                    self.resolution = "SD"
+                elif self.width < 1920:
+                    self.resolution = "HD"
+                elif self.width < 3840:
+                    self.resolution = "FHD"
+                else:
+                    self.resolution = "UHD"
+                self.aspect_ratio = track["display_aspect_ratio"]
+
+            elif track["track_type"] == 'Audio':
+                if self.language == "":
+                    if "language" in track:
+                        if track["language"] == 'en':
+                            self.language = track["language"]
+                self.audio_channels = track["channel_s"]
+
+            elif track["track_type"] == 'Text':
+                if self.subtitles == "":
+                    if track["language"] == 'en':
+                        self.subtitles = track["language"]
+
+            elif track["track_type"] == 'Menu':
+                self.menu = track
+            elif track["track_type"] == 'Other':
+                self.other = track
+            else:
+                print(f"Unknown track type: {track.track_type}")
+
+def get_media_info(url):
+    with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
+        r.raise_for_status()
+        chunk = r.raw.read(8192*2)
+        with tempfile.NamedTemporaryFile(prefix="x") as tmpfile:
+            with open(tmpfile.name, 'wb') as f:
+                f.write(chunk)
+            media_info = MediaInfo.parse(tmpfile.name)
+            data = media_info.to_data()
+            return MyMediaInfo(data)
+    return None
 
 # declare media_type as an enum with MOVIE and TV_SERIES as members
 class media_type:
@@ -17,6 +100,7 @@ class m3u(object):
     duration:float = None
     line_count:int= None
     media_type = None
+    resolution = None
 
     def __init__(self, title:str, url:str=None, line_count:int=None, lang:str=None, group:str=None,  duration:float=None, media_type:str=None):
         self.title:str = title.lower()
