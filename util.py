@@ -8,8 +8,10 @@ from typing import List
 import ipytv
 import ipytv.exceptions
 from ipytv.playlist import M3UPlaylist
+from langcodes import Language
 from pymediainfo import MediaInfo
 import requests
+from streamlit import audio
 import iptvdb
 from peewee import SqliteDatabase
 import logging
@@ -25,86 +27,125 @@ ipytv_logger.disabled = True
 
 
 class MyMediaInfo(object):
-    def __init__(self, media_info):
+    def __init__(self, media_info:dict):
         self.media_info = media_info
-        self.format = ""
-        self.duration = ""
-        self.file_size = ""
-        self.video_codec = ""
-        self.width = ""
-        self.height = ""
-        self.aspect_ratio = ""
-        self.language = ""
-        self.audio_channels = ""
-        self.subtitles = ""
-        self.resolution = ""
+        self.general = []
+        self.video = []
+        self.audio = []
+        self.subtitles = []
 
         for track in media_info["tracks"]:
             if track["track_type"] == 'General':
-                self.format = track.get("format")
-                self.duration = track.get("duration","0")
+                format = track.get("format")
+                duration = track.get("duration","0")
                 #convert duration seconds to hours and minutes
-                duration = int(self.duration)/1000 # convert to seconds
-                hours = duration // 3600
-                minutes = (duration % 3600) // 60
-                self.hour_minute = f"{hours}:{minutes}"
-                self.file_size = track.get("general_compliance","Element size -1").split()[2]
-                file_size = int(self.file_size)
+                duration = int(duration)/1000 # convert to seconds
+                hours = int(duration // 3600)
+                minutes = int((duration % 3600) // 60)
+                hour_minute = f"{hours}:{minutes}"
+                file_size = track.get("general_compliance","Element size -1").split()[2]
+                file_size = int(file_size)
                 if file_size == -1:
-                    self.human_file_size = "Not Found"
+                    human_file_size = "Not Found"
                 elif file_size < 1024:
-                    self.human_file_size = f"{file_size} B"
+                    human_file_size = f"{file_size} B"
                 elif file_size < 1024**2:
-                    self.human_file_size = f"{file_size/1024:.2f} KB"
+                    human_file_size = f"{file_size/1024:.2f} KB"
                 elif file_size < 1024**3:
-                    self.human_file_size = f"{file_size/1024**2:.2f} MB"
+                    human_file_size = f"{file_size/1024**2:.2f} MB"
                 else:
-                    self.human_file_size = f"{file_size/1024**3:.2f} GB"
+                    human_file_size = f"{file_size/1024**3:.2f} GB"
+                self.general.append({"format":format,
+                    "duration":duration,
+                    "hour_minute":hour_minute,
+                    "file_size":file_size,
+                    "human_file_size":human_file_size
+                })
 
             elif track["track_type"] == 'Video':
-                self.video_codec = track["internet_media_type"]
-                self.width = track["width"]
-                self.height = track["height"]
-                if self.width < 1080:
-                    self.resolution = "SD"
-                elif self.width < 1920:
-                    self.resolution = "HD"
-                elif self.width < 3840:
-                    self.resolution = "FHD"
+                video_codec = track["internet_media_type"]
+                width = track["width"]
+                height = track["height"]
+                if width < 1080:
+                    resolution = "SD"
+                elif width < 1920:
+                    resolution = "HD"
+                elif width < 3840:
+                    resolution = "FHD"
                 else:
-                    self.resolution = "UHD"
-                self.aspect_ratio = track["display_aspect_ratio"]
+                    resolution = "UHD"
+                aspect_ratio = track["display_aspect_ratio"]
+                self.video.append({"video_codec":video_codec,
+                                   "width":width,
+                                   "height":height,
+                                   "resolution":resolution,
+                                   "aspect_ratio":aspect_ratio})
 
             elif track["track_type"] == 'Audio':
-                if self.language == "":
-                    if "language" in track:
-                        if track["language"] == 'en':
-                            self.language = track["language"]
-                self.audio_channels = track["channel_s"]
+                language = track["language"]
+                audio_channels = track["channel_s"]
+                self.audio.append({"language":language,"audio_channels":audio_channels})
 
             elif track["track_type"] == 'Text':
-                if self.subtitles == "":
-                    if track["language"] == 'en':
-                        self.subtitles = track["language"]
+                language = track["language"]
+                self.subtitles.append({"language":language})
 
-            elif track["track_type"] == 'Menu':
-                self.menu = track
-            elif track["track_type"] == 'Other':
-                self.other = track
-            else:
-                print(f"Unknown track type: {track.track_type}")
+            # elif track["track_type"] == 'Menu':
+            #     self.menu = track
+            # elif track["track_type"] == 'Other':
+            #     self.other = track
+            # else:
+            #     print(f"Unknown track type: {track.track_type}")
+    def __get_general(self):
+        recs =[]
+        for track in self.general:
+            recs.append(f'Time:{track["hour_minute"]} Size:{track["human_file_size"]}')
+        return " | ".join(recs)
+    
+    def __get_video(self):
+        recs = []
+        for track in self.video:
+            recs.append(f"Quality: {track['resolution']} WxH:{track['width']}x{track['height']}")
+        return " | ".join(recs)
+    def __get_audio(self):
+        recs = []
+        for track in self.audio:
+            lang = Language.get(track['language']).display_name()
+            recs.append(f"Channels: {track['audio_channels']} Lang:{lang}")
+        return " | ".join(recs)
+    def __get_subtitles(self):
+        recs = []
+        for track in self.subtitles:
+            lang = Language.get(track['language']).display_name()
+            recs.append(f"Lang:{lang}")
+        return " | ".join(recs)
 
-def get_media_info(url):
-    with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
-        r.raise_for_status()
-        chunk = r.raw.read(8192*2)
-        with tempfile.NamedTemporaryFile(prefix="x") as tmpfile:
-            with open(tmpfile.name, 'wb') as f:
-                f.write(chunk)
-            media_info = MediaInfo.parse(tmpfile.name)
-            data = media_info.to_data()
-            return MyMediaInfo(data)
-    return None
+    def to_dict(self):
+        data = {"general":self.__get_general(),
+                "video":self.__get_video(),
+                "audio":self.__get_audio(),
+                "subtitles":self.__get_subtitles()
+                }
+        return data
+
+def get_media_info(url)->MyMediaInfo:
+    vid_stream_data, was_created=iptvdb.VideoStreamTbl.get_or_create(url=url)
+    if was_created:
+        with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
+            r.raise_for_status()
+            chunk = r.raw.read(8192*2)
+            with tempfile.NamedTemporaryFile(prefix="x") as tmpfile:
+                with open(tmpfile.name, 'wb') as f:
+                    f.write(chunk)
+                media_info = MediaInfo.parse(tmpfile.name)
+                media_json=media_info.to_json() # this is a string
+                vid_stream_data.media_info_json_str=media_json
+                vid_stream_data.save()
+
+                minfo= MyMediaInfo(json.loads(media_json))
+                return minfo
+    else:
+        return MyMediaInfo(vid_stream_data.get_media_info_json())
 
 # declare media_type as an enum with MOVIE and TV_SERIES as members
 class media_type:
@@ -247,20 +288,25 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
             iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url.in_(to_be_deleted)).execute()
 
 def download_large_file(target_file_name:str, url:str):
+    """ THis is a generator object to show progress
+    cannot be used by itself without being in an iterator loop
+    """
     with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
+        chunk_size = 1024 * 1024
         r.raise_for_status()
         file_size = r.headers["Content-Length"]
         # extract the file name from the url
             # Process the streamed data (e.g., save to file)
         with open(target_file_name, 'wb') as f:
-            chunks = int(file_size) // 8192
+            chunks = int(int(file_size) // chunk_size)
             chunk_count = 0
-            for chunk in r.iter_content(chunk_size=8192):
+            for chunk in r.iter_content(chunk_size=chunk_size):
                 chunk_count+=1
                 prog= chunk_count/chunks
                 if prog > 1: prog = 1
                 yield prog
                 f.write(chunk)
+    
 def download_regular_file(target_file_name:str, url:str):
     resp = requests.get(url, headers={'User-Agent':"Chrome"})
     resp.raise_for_status()

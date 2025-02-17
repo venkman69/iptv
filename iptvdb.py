@@ -1,7 +1,10 @@
 from ast import For
 from enum import unique
+import json
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
-                    IntegerField, Model, Database, ForeignKeyField)
+                    IntegerField, Model, Database, ForeignKeyField,
+                    FloatField)
+from pymediainfo import MediaInfo
 import requests
 from ipytv.channel import IPTVChannel
 from langcodes import *
@@ -55,18 +58,17 @@ class IPTVTbl(BaseModel):
 class VideoStreamTbl(BaseModel):
     # use the fields from MyMediaInfo
     url = ForeignKeyField(IPTVTbl, field="url", on_delete='CASCADE')
-    format = CharField(null=True)
-    duration = IntegerField(null=True)
-    file_size = IntegerField(null=True)
-    video_codec = CharField(null=True)
-    resolution = CharField(null=True)
-    audio_channels = IntegerField(null=True)
-    language = CharField(null=True)
-    subtitles = CharField(null=True)
-    width = IntegerField(null=True)
-    height = IntegerField(null=True)
-    aspect_ratio = CharField(null=True)
+    media_info_json_str = CharField(null=True)
 
+    def save(self, *args, **kwargs):
+        if type(self.media_info_json_str) == dict:
+            self.media_info_json_str = json.dumps(self.media_info_json_str)
+        super().save(*args, **kwargs) 
+        
+    def get_media_info_json(self)->dict:
+        if type(self.media_info_json_str) == str:
+            return json.loads(self.media_info_json_str)
+        return self.media_info_json_str
 
 class HistoryTbl(BaseModel):
     message = CharField()
