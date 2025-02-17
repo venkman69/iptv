@@ -12,6 +12,17 @@ from pymediainfo import MediaInfo
 import requests
 import iptvdb
 from peewee import SqliteDatabase
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
+ipytv_logger = logging.getLogger("ipytv.channel")
+ipytv_logger.disabled = True
+ipytv_logger = logging.getLogger("ipytv.playlist")
+ipytv_logger.disabled = True
+
+
 
 class MyMediaInfo(object):
     def __init__(self, media_info):
@@ -100,68 +111,6 @@ class media_type:
     MOVIE = "movie"
     TV_SERIES = "tv_series"
     LIVETV="liveTV"
-
-
-class xm3u(object):
-    # define class attributes
-    title:str = None
-    original_title:str = None
-    lang:str = None
-    group:str = None
-    url:str = None
-    duration:float = None
-    media_type = None
-    logo = None
-
-    # define the constructor
-    def __init__(self, item_json:dict=None):
-        """Typical fielnds in a record are
-        
-            "name": "Love Is Blind S08 E06",
-            "duration": "-1",
-            "url": "http://tvportal.in:8000/series/DPNM5hXxSG/RceYA7zHnp/779666.mkv",
-            "attributes": {
-                "tvg-id": "",
-                "tvg-name": "Love Is Blind S08 E06",
-                "tvg-logo": "https://image.tmdb.org/t/p/w300/cyb36wvt4EuDgLVLJrEsFuXwEj5.jpg",
-                "group-title": "Netflix Original's"
-            },
-            "extras": []
-        
-
-        Args:
-            item_json (dict, optional): _description_. Defaults to None.
-        """
-        self.original_title = item_json.get("name",None)
-        self.title = self.original_title.lower()
-        self.url = item_json.get("url",None)
-        if self.title==None or self.url == None:
-            raise ValueError("Invalid M3U item")
-        self.group = item_json.get("attributes",{}).get("group-title",None)
-        if "series" in self.url:
-            self.media_type = media_type.TV_SERIES
-        elif "movie" in self.url:
-            self.media_type = media_type.MOVIE
-        else:
-            self.media_type = media_type.LIVETV
-        self.duration = float(item_json.get("duration",0))
-        self.logo = item_json.get("attributes",{}).get("tvg-logo",None)
-
-    def test(self, title:str, url:str=None, line_count:int=None, lang:str=None, group:str=None,  duration:float=None, media_type:str=None):
-        self.title:str = title.lower()
-        self.original_title:str = title.strip()
-        self.url:str = url
-        self.line_count = line_count
-        if lang:
-            self.lang:str = lang.lower()
-        if group:
-            self.group:str = group.lower()
-        if duration:
-            self.duration:float = duration
-        if media_type:
-            self.media_type:str = media_type.lower()
-    def __lt__(self, other):
-        return self.title < other.title
 
 def construct_m3u_url(site:str, username:str, password:str):
     """construct a URL for an M3U file from the site, username and password.
@@ -261,6 +210,9 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
     except ipytv.exceptions.URLException as e:
         print(e)
         print("Failed to read m3u file")
+        raise e
+    except Exception as e:
+        print("Unknown error",e)
         raise e
 
     write_lock = threading.Lock()

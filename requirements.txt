@@ -3,5 +3,8 @@ streamlit_option_menu
 pandas
 requests
 black
-ffmpeg
 pymediainfo
+peewee
+m3u-ipytv
+langcodes
+language_data
