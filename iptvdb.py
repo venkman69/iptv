@@ -1,11 +1,7 @@
-from ast import For
-from enum import unique
 import json
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
-                    IntegerField, Model, Database, ForeignKeyField,
-                    FloatField)
-from pymediainfo import MediaInfo
-import requests
+                    IntegerField, Model, Database, ForeignKeyField
+                    )
 from ipytv.channel import IPTVChannel
 from langcodes import *
 import logging
