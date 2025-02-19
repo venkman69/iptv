@@ -29,6 +29,8 @@ DATABASE = Path(WORK_DIR)/"iptv.db"
 sqldb = SqliteDatabase(DATABASE)
 iptvdb.db_proxy.initialize(sqldb)
 iptvdb.create_all()
+cfg = get_config()
+DOWNLOAD_PATH= cfg["general"]["download_path"]
 
 
 # show a pulldown menu with groups from media_list and for language and a search input text for title
@@ -137,13 +139,19 @@ with tab_dl:
                     dl_progress = st.progress(0)
                     for item in selected_items.itertuples():
                         dl_progress.progress(counter / max)
-                        st.write(f"Downloading {item.Title} {item.URL}...")
+                        iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==item.URL)
+                        provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
+                        authenticated_url=provider_obj.get_any_url(item.URL)
+                        st.write(f"Downloading {item.Title} {authenticated_url}...")
                         file_extn = item.URL.split('.')[-1]
-                        target_file_name = f"{item.Title}.{file_extn}"
-                        file_dl_progress= st.progress(0)
-                        for prog in download_large_file(target_file_name, item.URL):
-                            file_dl_progress.progress(prog)
-                        counter += 1
+                        target_file_name = Path(DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+                        if target_file_name.exists():
+                            st.write(f"Not Downloading {item.Title} as Target file exists: {target_file_name}")
+                        else:
+                            file_dl_progress= st.progress(0)
+                            for prog in download_large_file(target_file_name, authenticated_url):
+                                file_dl_progress.progress(prog)
+                            counter += 1
                         # Add your download logic here
                 empty_space.empty()
                 st.write(f"Download completed : {counter} items")

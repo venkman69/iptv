@@ -1,3 +1,4 @@
+from configparser import ConfigParser
 from datetime import datetime
 import json
 from pathlib import Path
@@ -326,6 +327,11 @@ def download_regular_file_mock(target_file_name:str, url:str):
     #mock it with the vod.m3u file
     shutil.copyfile("vod.m3u", target_file_name)
     print("mock file used")
+
+def get_config():
+    cfg = ConfigParser()
+    cfg.read("iptv_downloader.ini")
+    return cfg
 
 if __name__ == '__main__':
     WORK_DIR="./work"
