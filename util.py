@@ -4,7 +4,6 @@ from pathlib import Path
 import shutil
 import tempfile
 import threading
-from typing import List
 import ipytv
 import ipytv.exceptions
 from ipytv.playlist import M3UPlaylist
@@ -15,10 +14,21 @@ from streamlit import audio
 import iptvdb
 from peewee import SqliteDatabase
 import logging
+import time
+
+currenttimemillis=lambda: int(round(time.time() * 1000))
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
+# logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
+# configure log output to contain datetime, method and line number
+formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
+                        datefmt="%Y-%m-%d %H:%M:%S")
+file_handler = logging.FileHandler('iptv_downloader.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
 ipytv_logger = logging.getLogger("ipytv.channel")
 ipytv_logger.disabled = True
 ipytv_logger = logging.getLogger("ipytv.playlist")
@@ -129,9 +139,12 @@ class MyMediaInfo(object):
         return data
 
 def get_media_info(url)->MyMediaInfo:
+    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==url)
+    provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
     vid_stream_data, was_created=iptvdb.VideoStreamTbl.get_or_create(url=url)
+    authenticated_url=provider_obj.get_any_url(url)
     if was_created:
-        with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
+        with requests.get(authenticated_url, stream=True,headers={'User-Agent':"Chrome"}) as r:
             r.raise_for_status()
             chunk = r.raw.read(8192*2)
             with tempfile.NamedTemporaryFile(prefix="x") as tmpfile:
@@ -175,61 +188,18 @@ def read_m3u(m3u_url:str)->M3UPlaylist: #->List[iptvdb.IPTVTbl]:
     media_list = []
     try:
         with tempfile.NamedTemporaryFile(prefix="vod") as tmpfile:
+            logger.debug(f"Beginning download of m3u")
             download_regular_file(tmpfile.name, m3u_url)
+            logger.debug(f"Completed download of m3u, Parsing m3u file")
             m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
+            logger.debug(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
             return m3u_playlist
-            for item in m3u_playlist:
-                rec = iptvdb.IPTVTbl()
-                rec.get_from_m3u_channel_object(item, m3u_url)
-                media_list.append(rec)
-            return media_list
     except Exception as e:
         print(e)
         raise e
     raise Exception("Failed to read M3U file")
 
-    # with open(file_path, 'r', encoding='utf-8') as f:
-    #     group_uri = False
-    #     line_count=0
-    #     for line in f:
-    #         line_count+=1
-    #         line = line.strip()
-    #         if line.startswith('#EXTM3U'):
-    #             continue
-    #         elif line.startswith('#EXTINF:'):
-    #             if "####" in line:
-    #                 current_group = line.split()[1]
-    #                 group_uri = True
-    #                 continue
-    #             parts = line[8:].split(',', 1)
-    #             duration = float(parts[0])
-    #             #using re match a 2 or 3 letter language then hyphen then title
-    #             lang_title = parts[1].strip()[:6].split('-', 1)
-    #             if len(lang_title) == 2:
-    #                 lang_field = lang_title[0].strip()
-    #                 if (len(lang_field) == 2 or len(lang_field) == 3) and lang_field.isalpha():
-    #                     lang = lang_title[0].strip()
-    #                 # lang = lang_title[0].strip()
-    #                     title = parts[1].strip().split('-',1)[1].strip()
-    #             else:
-    #                 lang = ""
-    #                 title = parts[1].strip()
-    #             current_entry:m3u = m3u(title=title, lang=lang, group=current_group)
-    #         elif line:
-    #             if group_uri:
-    #                 group_uri = False
-    #                 continue
-    #             current_entry.url = line
-    #             if "movie" in line:
-    #                 current_entry.media_type = media_type.MOVIE
-    #             elif "series" in line:
-    #                 current_entry.media_type = media_type.TV_SERIES
-                
-    #             current_entry.line_count = line_count
-    #             media_list.append(current_entry)
-    #             current_entry = {}
-    # return media_list
 
 def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
     """Updates iptvd database with the contents of an M3U file from url
@@ -243,11 +213,34 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
         e: _description_
     """
 
-    m3u_url = construct_m3u_url(provider_base_url, username, password)
+    write_lock = threading.Lock()
+
+    start=currenttimemillis()
+    if iptvdb.IPTVProviderTbl.select().where(
+        iptvdb.IPTVProviderTbl.provider == provider_base_url).count() == 0:
+        with write_lock:
+            provider_object:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.create(provider=provider_base_url,
+                                        username=username, 
+                                        password=password,
+                                        last_updated=datetime.now(),
+                                        enabled=True)
+        logger.debug(f"Wrote Provider to table {provider_base_url}")
+    else:
+        provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==provider_base_url)
+
+    m3u_url = provider_object.get_m3u_url()
+    logger.debug(f"Fetched m3u url {m3u_url}")
+
     try:
+        start=currenttimemillis()
         media_list:M3UPlaylist = read_m3u(m3u_url)
+        finish=currenttimemillis()
+        logger.debug(f"M3u fetch took {finish - start}ms")
+        start=currenttimemillis()
         for chan in media_list:
             chan.attributes["provider"] = provider_base_url
+        finish=currenttimemillis()
+        logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
     except ipytv.exceptions.URLException as e:
         print(e)
         print("Failed to read m3u file")
@@ -256,36 +249,51 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
         print("Unknown error",e)
         raise e
 
-    write_lock = threading.Lock()
-    if iptvdb.IPTVProviderTbl.select().where(iptvdb.IPTVProviderTbl.provider == provider_base_url).count() == 0:
-        with write_lock:
-            iptvdb.IPTVProviderTbl.create(provider=provider_base_url,
-                                          m3u_url=m3u_url, 
-                                          last_updated=datetime.now(),
-                                          enabled=True)
     # select records where provider is iptv_provider
     first_run = iptvdb.IPTVTbl.select().where(iptvdb.IPTVTbl.provider == provider_base_url).count( ) == 0
+    logger.debug(f"Checked if IPTVTbl has any records for this provider: {first_run}")
     
     if first_run:
         records=[]
+        start=currenttimemillis()
+        counter=0
         for item in media_list:
             iptvobj = iptvdb.IPTVTbl()
-            iptvobj.get_from_m3u_channel_object(item)
+            iptvobj.get_from_m3u_channel_object(item, provider_object)
+            records.append(iptvobj)
+            counter +=1
+            middle=currenttimemillis()
+            if counter % 10000 == 0:
+                logger.debug(f"Added 10k records at {counter*1000/(middle-start)}/sec")
+                with write_lock:
+                    iptvdb.IPTVTbl.bulk_create(records) #, batch_size=10000)
+                records=[]
+        with write_lock:
+            iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
+        finish=currenttimemillis()
+        logger.debug(f"Created list of IPTVTbl records, len:{len(records)}")
+        start=currenttimemillis()
+        finish=currenttimemillis()
+        logger.debug(f"Executed bulk create IPTVTbl records:{finish-start}ms")
+        
+    else:
+        records=[]
+        logger.debug(f"IPTVTbl records exist, updating missing items")
+        existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider==provider_base_url) ]
+        item_dict = {provider_object.tokenize_channel_url(item.url): item for item in media_list}
+        to_be_created=set(item_dict.keys()) - set(existing_urls)
+        to_be_deleted=set(existing_urls) - set(item_dict.keys())
+        start=currenttimemillis()
+        for key in to_be_created:
+            item = item_dict[key]
+            iptvobj=iptvdb.IPTVTbl()
+            iptvobj.get_from_m3u_channel_object(item,provider_object)
             records.append(iptvobj)
         with write_lock:
             iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
-    else:
-        records=[]
-        existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url) ]
-        item_dict = {item.url: item for item in media_list}
-        to_be_created=set(item_dict.keys()) - set(existing_urls)
-        to_be_deleted=set(existing_urls) - set(item_dict.keys())
-        for key in to_be_created:
-            item = item_dict[key]
-            records.append(iptvdb.IPTVTbl(url=item.url, title=item.title, original_title=item.original_title, lang=item.lang, group=item.group, duration=item.duration, line_count=item.line_count, media_type=item.media_type))
-        with write_lock:
-            iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
-            iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url.in_(to_be_deleted)).execute()
+            iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url in to_be_deleted).execute()
+        finish=currenttimemillis()
+        logger.debug(f"Completed update of IPTVTbl in {finish-start}ms")
 
 def download_large_file(target_file_name:str, url:str):
     """ THis is a generator object to show progress
@@ -316,7 +324,7 @@ def download_regular_file(target_file_name:str, url:str):
 
 def download_regular_file_mock(target_file_name:str, url:str):
     #mock it with the vod.m3u file
-    shutil.copyfile("vod10001.m3u", target_file_name)
+    shutil.copyfile("vod.m3u", target_file_name)
     print("mock file used")
 
 if __name__ == '__main__':

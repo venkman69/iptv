@@ -100,6 +100,10 @@ with tab_dl:
             for item in filtered_media
             ])
             filtered_media_df["Download"] = False
+            # reorder filtered_media_df column so that Download is at the beginning
+            cols = ["Download"] + [col for col in filtered_media_df.columns if col != "Download"]
+            filtered_media_df = filtered_media_df[cols]
+
             # st.write(filtered_media_df)
             download_items_df = st.data_editor(filtered_media_df, column_config={"Download": st.column_config.CheckboxColumn(default=False)})
 
