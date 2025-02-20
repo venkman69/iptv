@@ -43,7 +43,7 @@ ipytv_logger.disabled = True
 
 
 class MyMediaInfo(object):
-    def __init__(self, media_info:dict):
+    def __init__(self, media_info:dict, content_length:int=-1):
         self.media_info = media_info
         self.general = []
         self.video = []
@@ -59,8 +59,11 @@ class MyMediaInfo(object):
                 hours = int(duration // 3600)
                 minutes = int((duration % 3600) // 60)
                 hour_minute = f"{hours}:{minutes}"
-                file_size = track.get("general_compliance","Element size -1").split()[2]
-                file_size = int(file_size)
+                if content_length > 0:
+                    file_size = content_length
+                else:
+                    file_size = track.get("general_compliance","Element size -1").split()[2]
+                    file_size = int(file_size)
                 if file_size == -1:
                     human_file_size = "Not Found"
                 elif file_size < 1024:
@@ -153,6 +156,10 @@ def get_media_info(url)->MyMediaInfo:
         with requests.get(authenticated_url, stream=True,headers={'User-Agent':"Chrome"}) as r:
             r.raise_for_status()
             chunk = r.raw.read(8192*2)
+            if 'content-length' in r.headers:
+                content_length = int(r.headers['content-length'])
+            else:
+                content_length=-1
             with tempfile.NamedTemporaryFile(prefix="x") as tmpfile:
                 with open(tmpfile.name, 'wb') as f:
                     f.write(chunk)
@@ -161,7 +168,7 @@ def get_media_info(url)->MyMediaInfo:
                 vid_stream_data.media_info_json_str=media_json
                 vid_stream_data.save()
 
-                minfo= MyMediaInfo(json.loads(media_json))
+                minfo= MyMediaInfo(json.loads(media_json), content_length)
                 return minfo
     else:
         return MyMediaInfo(vid_stream_data.get_media_info_json())
