@@ -30,7 +30,8 @@ sqldb = SqliteDatabase(DATABASE)
 iptvdb.db_proxy.initialize(sqldb)
 iptvdb.create_all()
 cfg = get_config()
-DOWNLOAD_PATH= cfg["general"]["download_path"]
+MOVIE_DOWNLOAD_PATH= cfg["general"]["movie_download_path"]
+SERIES_DOWNLOAD_PATH= cfg["general"]["series_download_path"]
 
 
 # show a pulldown menu with groups from media_list and for language and a search input text for title
@@ -144,7 +145,11 @@ with tab_dl:
                         authenticated_url=provider_obj.get_any_url(item.URL)
                         st.write(f"Downloading {item.Title} {authenticated_url}...")
                         file_extn = item.URL.split('.')[-1]
-                        target_file_name = Path(DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+                        if iptv_obj.media_type == "movie":
+                            target_file_name = Path(MOVIE_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+                        if iptv_obj.media_type == "series":
+                            target_file_name = Path(SERIES_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+                        
                         if target_file_name.exists():
                             st.write(f"Not Downloading {item.Title} as Target file exists: {target_file_name}")
                         else:

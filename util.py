@@ -1,6 +1,8 @@
 from configparser import ConfigParser
 from datetime import datetime
 import json
+import multiprocessing
+import multiprocessing.queues
 from pathlib import Path
 import shutil
 import tempfile
@@ -8,6 +10,7 @@ import threading
 import ipytv
 import ipytv.exceptions
 from ipytv.playlist import M3UPlaylist
+from ipytv.channel import IPTVChannel
 from langcodes import Language
 from pymediainfo import MediaInfo
 import requests
@@ -16,8 +19,10 @@ import iptvdb
 from peewee import SqliteDatabase
 import logging
 import time
+from diskcache import Cache
 
 currenttimemillis=lambda: int(round(time.time() * 1000))
+dc = Cache("work/m3ucache")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -187,6 +192,10 @@ def construct_m3u_url(site:str, username:str, password:str):
 def read_m3u(m3u_url:str)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
     """Reads an extended M3U file and returns a list of media entries."""
     media_list = []
+    m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
+    if m3u_playlist:
+        logger.info("Returning cached m3u_playlist")
+        return m3u_playlist
     try:
         with tempfile.NamedTemporaryFile(prefix="vod") as tmpfile:
             logger.debug(f"Beginning download of m3u")
@@ -195,6 +204,7 @@ def read_m3u(m3u_url:str)->M3UPlaylist: #->List[iptvdb.IPTVTbl]:
             m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
             logger.debug(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
+            dc.set(key=m3u_url,value= m3u_playlist,expire=86400)
             return m3u_playlist
     except Exception as e:
         print(e)
@@ -252,25 +262,16 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
 
     # select records where provider is iptv_provider
     first_run = iptvdb.IPTVTbl.select().where(iptvdb.IPTVTbl.provider == provider_base_url).count( ) == 0
-    logger.debug(f"Checked if IPTVTbl has any records for this provider: {first_run}")
+    logger.debug(f"Checked if IPTVTbl has no records for this provider: {first_run}")
     
     if first_run:
         records=[]
-        start=currenttimemillis()
         counter=0
-        for item in media_list:
-            iptvobj = iptvdb.IPTVTbl()
-            iptvobj.get_from_m3u_channel_object(item, provider_object)
-            records.append(iptvobj)
-            counter +=1
-            middle=currenttimemillis()
-            if counter % 10000 == 0:
-                logger.debug(f"Added 10k records at {counter*1000/(middle-start)}/sec")
-                with write_lock:
-                    iptvdb.IPTVTbl.bulk_create(records) #, batch_size=10000)
-                records=[]
-        with write_lock:
-            iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
+
+        # start=currenttimemillis()
+        records = create_iptvdbtbl_objects_threaded(media_list, provider_object)
+        finish=currenttimemillis()
+        logger.debug(f"Finished writing in {(finish-start)}")
         finish=currenttimemillis()
         logger.debug(f"Created list of IPTVTbl records, len:{len(records)}")
         start=currenttimemillis()
@@ -281,7 +282,11 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
         records=[]
         logger.debug(f"IPTVTbl records exist, updating missing items")
         existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider==provider_base_url) ]
-        item_dict = {provider_object.tokenize_channel_url(item.url): item for item in media_list}
+        item_dict = {}
+        for item in media_list:
+            if not ( "series" in item.url or "movie" in item.url):
+                continue
+            item_dict[provider_object.tokenize_channel_url(item.url)]=item
         to_be_created=set(item_dict.keys()) - set(existing_urls)
         to_be_deleted=set(existing_urls) - set(item_dict.keys())
         start=currenttimemillis()
@@ -292,9 +297,50 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
             records.append(iptvobj)
         with write_lock:
             iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
-            iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url in to_be_deleted).execute()
+            logger.debug(f"Added rows: {len(records)}")
+            rows_deleted = iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url << to_be_deleted).execute()
+            logger.debug(f"Deleted rows: {rows_deleted}")
         finish=currenttimemillis()
         logger.debug(f"Completed update of IPTVTbl in {finish-start}ms")
+
+def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object):
+    mp = multiprocessing.Pool()
+    input_items = []
+    records = []
+    write_lock = threading.Lock()
+    start = currenttimemillis()
+    counter = 0
+
+    def process_batch(batch):
+        results = mp.map(threaded_iptvobj_creator, [(item, provider_object) for item in batch])
+        with write_lock:
+            iptvdb.IPTVTbl.bulk_create(results, batch_size=10000)
+        # return results
+
+    chunk=50000
+    for item in media_list:
+        if not ("series" in item.url or "movie" in item.url):
+            continue
+        input_items.append(item)
+        if len(input_items) == chunk:
+            counter+=1
+            logger.debug(f"Processing block: {counter * chunk}")
+            process_batch(input_items)
+            input_items = []
+
+    if input_items:
+        process_batch(input_items)
+
+    finish = currenttimemillis()
+    logger.debug(f"Threaded create and write IPTVTbl records took {finish - start}ms")
+    return records
+
+def threaded_iptvobj_creator(args):
+    item, provider_object = args
+    iptvobj = iptvdb.IPTVTbl()
+    iptvobj.get_from_m3u_channel_object(item, provider_object)
+    # logger.debug(f"Created IPTVTbl object for {iptvobj.url}")
+    return iptvobj
 
 def download_large_file(target_file_name:str, url:str):
     """ THis is a generator object to show progress
@@ -341,10 +387,4 @@ if __name__ == '__main__':
     iptvdb.create_all()
     # http://tvstation.cc/get.php?username=TFFR5GY&password=NCW4K8P&type=m3u&output=mpegts
     
-    # try:
-    #     media = read_m3u("http://tvstation.cc", "TFFR5GY", "NCW4K8P")
-    # except ipytv.exceptions.URLException as e:
-    #     print(e)
-    #     print("Failed to read m3u file")
-    #     exit(1)
     update_iptvdb_tbl("http://tvstation.cc","TFFR5GY", "NCW4K8P")
