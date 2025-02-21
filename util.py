@@ -53,12 +53,12 @@ class MyMediaInfo(object):
         for track in media_info["tracks"]:
             if track["track_type"] == 'General':
                 format = track.get("format")
-                duration = track.get("duration","0")
-                #convert duration seconds to hours and minutes
-                duration = int(duration)/1000 # convert to seconds
+                duration = track.get("duration", "0")
+                # convert duration seconds to hours and minutes
+                duration = int(duration) / 1000  # convert to seconds
                 hours = int(duration // 3600)
                 minutes = int((duration % 3600) // 60)
-                hour_minute = f"{hours}:{minutes}"
+                hour_minute = f"{hours:02}:{minutes:02}"
                 if content_length > 0:
                     file_size = content_length
                 else:
@@ -82,7 +82,7 @@ class MyMediaInfo(object):
                 })
 
             elif track["track_type"] == 'Video':
-                video_codec = track["internet_media_type"]
+                video_codec = track.get("internet_media_type","-")
                 width = track["width"]
                 height = track["height"]
                 if width < 1080:
@@ -95,19 +95,19 @@ class MyMediaInfo(object):
                     resolution = "UHD"
                 aspect_ratio = track["display_aspect_ratio"]
                 self.video.append({"video_codec":video_codec,
-                                   "width":width,
-                                   "height":height,
-                                   "resolution":resolution,
-                                   "aspect_ratio":aspect_ratio})
+                    "width":width,
+                    "height":height,
+                    "resolution":resolution,
+                    "aspect_ratio":aspect_ratio})
 
             elif track["track_type"] == 'Audio':
-                language = track["language"]
-                audio_channels = track["channel_s"]
-                self.audio.append({"language":language,"audio_channels":audio_channels})
+                language = track.get("language")
+                audio_channels = track.get("channel_s")
+                self.audio.append({"language": language, "audio_channels": audio_channels})
 
             elif track["track_type"] == 'Text':
-                language = track["language"]
-                self.subtitles.append({"language":language})
+                language = track.get("language")
+                self.subtitles.append({"language": language})
 
             # elif track["track_type"] == 'Menu':
             #     self.menu = track
@@ -118,25 +118,25 @@ class MyMediaInfo(object):
     def __get_general(self):
         recs =[]
         for track in self.general:
-            recs.append(f'Time:{track["hour_minute"]} Size:{track["human_file_size"]}')
+            recs.append(f'{track["hour_minute"]} :{track["human_file_size"]}')
         return " | ".join(recs)
     
     def __get_video(self):
         recs = []
         for track in self.video:
-            recs.append(f"Quality: {track['resolution']} WxH:{track['width']}x{track['height']}")
+            recs.append(f"{track['resolution']} WxH:{track['width']}x{track['height']}")
         return " | ".join(recs)
     def __get_audio(self):
         recs = []
         for track in self.audio:
             lang = Language.get(track['language']).display_name()
-            recs.append(f"Channels: {track['audio_channels']} Lang:{lang}")
+            recs.append(f"({track['audio_channels']}:{lang})")
         return " | ".join(recs)
     def __get_subtitles(self):
         recs = []
         for track in self.subtitles:
             lang = Language.get(track['language']).display_name()
-            recs.append(f"Lang:{lang}")
+            recs.append(lang)
         return " | ".join(recs)
 
     def to_dict(self):
@@ -148,6 +148,8 @@ class MyMediaInfo(object):
         return data
 
 def get_media_info(url)->MyMediaInfo:
+    # read a 2MB chunk
+    chunk_size = 1024 * 1024 * 2
     iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==url)
     provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
     vid_stream_data, was_created=iptvdb.VideoStreamTbl.get_or_create(url=url)
@@ -155,7 +157,7 @@ def get_media_info(url)->MyMediaInfo:
     if was_created:
         with requests.get(authenticated_url, stream=True,headers={'User-Agent':"Chrome"}) as r:
             r.raise_for_status()
-            chunk = r.raw.read(8192*2)
+            chunk = r.raw.read(chunk_size)
             if 'content-length' in r.headers:
                 content_length = int(r.headers['content-length'])
             else:
@@ -394,4 +396,11 @@ if __name__ == '__main__':
     iptvdb.create_all()
     # http://tvstation.cc/get.php?username=TFFR5GY&password=NCW4K8P&type=m3u&output=mpegts
     
-    update_iptvdb_tbl("http://tvstation.cc","TFFR5GY", "NCW4K8P")
+    # update_iptvdb_tbl("http://tvstation.cc","TFFR5GY", "NCW4K8P")
+    # update_iptvdb_tbl("http://line.myox.me","3kgolbiu48", "6o6ivdhzer")
+# http://line.myox.me/get.php?username=3kgolbiu48&password=6o6ivdhzer&type=m3u_plus&output=ts
+    # update_iptvdb_tbl("http://tvportal.in:8000", "KS7RDDfvd9","Tx4zYhYY4q")
+
+    media_info = MediaInfo.parse('minfo')
+    print(media_info.audio_tracks[0])
+    print(media_info.video_tracks[0])
