@@ -9,7 +9,7 @@ import re
 import time
 from typing import List
 
-from numpy import empty
+from numpy import empty, where
 import streamlit as st
 import pandas as pd
 import os
@@ -68,9 +68,20 @@ groups = st.session_state.groups
 
 with st.sidebar:
     # Create Streamlit widgets for group and language selection, and title search
+    providers =["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()]
+    selected_provider = st.selectbox("Select Provider",providers)
     selected_media_type = st.selectbox("Select Media Type", ["All", "movie", "series", "livetv"])
+    where_clause = (1==1)
+    if selected_provider != "All":
+        where_clause = (where_clause & ( iptvdb.IPTVTbl.provider == selected_provider) )
     if selected_media_type != "All":
-        groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(iptvdb.IPTVTbl.media_type==selected_media_type)]
+        where_clause = (where_clause & ( iptvdb.IPTVTbl.media_type == selected_media_type) )
+    # groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(
+    #         (iptvdb.IPTVTbl.media_type==selected_media_type) & 
+    #         ( iptvdb.IPTVTbl.provider == selected_provider)
+    #     )]
+    groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(where_clause)]
+
     selected_group = st.selectbox("Select Group", ["All"] + groups)
     search_title = st.text_input("Search Title").lower()
 with tab_dl:
