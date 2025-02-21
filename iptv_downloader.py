@@ -85,24 +85,26 @@ with st.sidebar:
     selected_group = st.selectbox("Select Group", ["All"] + groups)
     search_title = st.text_input("Search Title").lower()
 with tab_dl:
-    if search_title or selected_group != "All" or selected_media_type != "All":
-        print(f"selected_group: {selected_group}, search_title: {search_title}")
-        search_cache_key = sha256(f"{selected_group}{selected_media_type}{search_title}".encode()).hexdigest()
+    where_clauses = [(1 == 1)]
+    if selected_provider != "All":
+        where_clauses.append((iptvdb.IPTVTbl.provider == selected_provider ))
+    if selected_group != "All":
+        where_clauses.append((iptvdb.IPTVTbl.group == selected_group ) )
+    if selected_media_type != "All":
+        where_clauses.append((iptvdb.IPTVTbl.media_type == selected_media_type ) )
+    if search_title or selected_group != "All" or selected_media_type != "All" or selected_provider != "All":
+        print(f"Provider: {selected_provider} selected_group: {selected_group}, search_title: {search_title}")
+        search_cache_key = sha256(f"{selected_provider}{selected_group}{selected_media_type}{search_title}".encode()).hexdigest()
         if st.session_state.get(search_cache_key):
             filtered_media = st.session_state[search_cache_key]
         else:
             filtered_media = []
-            prefilter = iptvdb.IPTVTbl.select()
-            if selected_group != "All":
-                prefilter = prefilter.where(iptvdb.IPTVTbl.group==selected_group)
-            if selected_media_type != "All":
-                prefilter = prefilter.where(iptvdb.IPTVTbl.media_type== selected_media_type)
             
             search_words = search_title.split()
             for word in search_words:
-                prefilter = prefilter.where(iptvdb.IPTVTbl.title.contains(word))
+                where_clauses.append((iptvdb.IPTVTbl.title.contains(word)))
                 
-            filtered_media = prefilter.order_by(iptvdb.IPTVTbl.title)
+            filtered_media = iptvdb.IPTVTbl.select().where(*where_clauses).order_by(iptvdb.IPTVTbl.title)
             st.session_state[search_cache_key] = filtered_media
         # display the records in filtered_media as a table
         if not filtered_media:
@@ -167,6 +169,7 @@ with tab_dl:
                             file_dl_progress= st.progress(0)
                             for prog in download_large_file(target_file_name, authenticated_url):
                                 file_dl_progress.progress(prog)
+                            file_dl_progress.empty()
                             counter += 1
                         # Add your download logic here
                 empty_space.empty()
