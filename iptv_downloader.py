@@ -177,75 +177,17 @@ with tab_dl:
     else:
         st.write("Enter a search title to filter the media list")
 
-    # if not filtered_media:
-    #     st.write("No media found matching the selected criteria.")
-    # else:
-    #     # Display filtered media list
-    #     st.write("Filtered Media List:")
-    #     # Display filtered media list as a table with download checkboxes
-    #     filtered_media_langs = sorted(set(item.lang for item in filtered_media if item.lang is not None))
+with tab_m3u_mgr:
+    st.header("M3U Manager")
+    if "providers" not in st.session_state:
+        # Logic to refresh providers
+        st.session_state.providers = ["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()]
 
-    #     selected_media_type = st.selectbox("Filter Languages", ["All"]+filtered_media_langs)
-    #     item:m3u=None
-    #     filtered_media_df = pd.DataFrame([
-    #         {"Title": item.original_title,"Lang": item.lang, 
-    #         "url": item.url, "Download": False}
-    #         for item in filtered_media if item.lang == selected_media_type or selected_media_type == "All"
-    #     ])
-
-    #     download_items_df = st.data_editor(filtered_media_df, column_config={"Download": st.column_config.CheckboxColumn(default=False)})
-    #     # show a list of selected items and offer a download start button
-    #     selected_items = download_items_df[download_items_df["Download"] == True]
-    #     if selected_items.empty:
-    #         st.write("No items selected")
-    #     else:
-    #         if "selected_items_details" in st.session_state:
-    #             # then only fetch items that are missing
-    #             selected_items_details = st.session_state.selected_items_details
-    #         else:
-    #             selected_items_details = {}
-    #         details=[]
-    #         for item in selected_items.itertuples():
-    #             if item.url in selected_items_details:
-    #                 media_info:MyMediaInfo = selected_items_details[item.url]
-    #             else:
-    #                 media_info:MyMediaInfo = get_media_info(item.url)
-    #                 selected_items_details[item.url] = media_info
-    #             details.append({"Title": item.Title, "format": media_info.format,
-    #                             "duration":media_info.hour_minute,
-    #                                 "file_size":media_info.human_file_size,
-    #                                 "video_codec":media_info.video_codec,
-    #                                 "resolution":media_info.resolution,
-    #                                 "audio_channels":str(media_info.audio_channels),
-    #                                 "language":media_info.language,
-    #                                 "subtitles":media_info.subtitles,
-    #             })
-
-    #         st.session_state.selected_items_details = selected_items_details
-    #         st.write(pd.DataFrame(details))
-    #         if st.button("Download Selected Items"):
-    #             # show a progress bar for each download
-    #             empty_space = st.empty()
-    #             with empty_space.container():
-    #                 counter = 0
-    #                 max = len(selected_items)
-    #                 dl_progress = st.progress(0)
-    #                 for item in selected_items.itertuples():
-    #                     dl_progress.progress(counter / max)
-    #                     # with st.spinner(f"Downloading {item.Title} {item.url}..."):
-    #                     file_extn = item.url.split('.')[-1]
-    #                     target_file_name = f"{item.Title}.{file_extn}"
-    #                     download_large_file(target_file_name, item.url)
-    #                     counter += 1
-    #                     # Add your download logic here
-    #             empty_space.empty()
-    #             st.write(f"Download completed : {counter} items")
-
-
-# # Add a submit button
-# if st.button("Submit"):
-#     for item in filtered_media:
-#         if st.session_state.get(f"download_{item.title}"):
-#             st.write(f"Downloading {item.title}...")
-#             # Add your download logic here
-
+    # Display the list of providers
+    providers = st.session_state.get("providers", ["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()])
+    selected_provider = st.selectbox("Provider to Refresh",providers)
+    st.write(f"Selected Provider: {selected_provider}")
+    if st.button("Refresh"):
+        # provider_info:iptvdb.IPTVProviderTbl= iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider == selected_provider)
+        with st.spinner():
+            update_iptvdb_tbl(selected_provider,None,None, st)
