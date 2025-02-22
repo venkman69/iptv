@@ -138,7 +138,7 @@ with tab_dl:
                     for item in selected_items.itertuples():
                         dl_progress.progress(counter / max)
                         iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==item.URL)
-                        provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
+                        provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider_m3u_base==iptv_obj.provider_m3u_base)
                         authenticated_url=provider_obj.get_any_url(item.URL)
                         st.write(f"Downloading {item.Title} {authenticated_url}...")
                         file_extn = item.URL.split('.')[-1]
