@@ -212,15 +212,15 @@ def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTb
         with tempfile.NamedTemporaryFile(prefix="vod") as tmpfile:
             logger.debug(f"Beginning download of m3u")
             if st:
-                logger.debugst.write(f"Beginning download of m3u")
+                st.write(f"Beginning download of m3u")
             download_regular_file(tmpfile.name, m3u_url)
             logger.debug(f"Completed download of m3u, Parsing m3u file")
             if st:
-                logger.debugst.write(f"Completed download of m3u, Parsing m3u file")
+                st.write(f"Completed download of m3u, Parsing m3u file")
             m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
             logger.debug(f"Completed parsing m3u file")
             if st:
-                logger.debugst.write(f"Completed parsing m3u file")
+                st.write(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
             dc.set(key=m3u_url,value= m3u_playlist,expire=86400)
             return m3u_playlist
