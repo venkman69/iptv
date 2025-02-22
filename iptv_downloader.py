@@ -57,7 +57,7 @@ with st.sidebar:
     selected_media_type = st.selectbox("Select Media Type", ["All", "movie", "series", "livetv"])
     where_clause = (1==1)
     if selected_provider != "All":
-        where_clause = (where_clause & ( iptvdb.IPTVTbl.provider == selected_provider) )
+        where_clause = (where_clause & ( iptvdb.IPTVTbl.provider_m3u_base == selected_provider) )
     if selected_media_type != "All":
         where_clause = (where_clause & ( iptvdb.IPTVTbl.media_type == selected_media_type) )
     # groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(
