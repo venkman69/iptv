@@ -251,14 +251,13 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
     start=currenttimemillis()
     provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider_m3u_base==provider_m3u_base)
     if provider_object is None:
-        provider_object:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl()
-        provider_object.provider_site=provider_site
-        provider_object.provider_m3u_base=provider_m3u_base
-        provider_object.username=username
-        provider_object.password=password
-        provider_object.last_updated=datetime.now()
-        provider_object.enabled=True
         with write_lock:
+            provider_object:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.create(provider_m3u_base=provider_m3u_base)
+            provider_object.provider_site=provider_site
+            provider_object.username=username
+            provider_object.password=password
+            provider_object.last_updated=datetime.now()
+            provider_object.enabled=True
             provider_object.save()
 
         logger.debug(f"Wrote Provider to table {provider_m3u_base}")
