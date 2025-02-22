@@ -363,9 +363,13 @@ def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:i
         # return results
 
     chunk=50000
+    urls_processed=set()
     for item in media_list:
         if not ("series" in item.url or "movie" in item.url):
             continue
+        if item.url in urls_processed:
+            continue
+        urls_processed.add(item.url)
         input_items.append(item)
         if len(input_items) == chunk:
             counter+=1
