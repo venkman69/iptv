@@ -71,7 +71,7 @@ with st.sidebar:
 with tab_dl:
     where_clauses = [(1 == 1)]
     if selected_provider != "All":
-        where_clauses.append((iptvdb.IPTVTbl.provider == selected_provider ))
+        where_clauses.append((iptvdb.IPTVTbl.provider_m3u_base == selected_provider ))
     if selected_group != "All":
         where_clauses.append((iptvdb.IPTVTbl.group == selected_group ) )
     if selected_media_type != "All":
