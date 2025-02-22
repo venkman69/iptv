@@ -15,6 +15,7 @@ from langcodes import Language
 from pymediainfo import MediaInfo
 import requests
 from streamlit import audio
+import streamlit
 import iptvdb
 from peewee import SqliteDatabase
 import logging
@@ -198,20 +199,28 @@ def construct_m3u_url(site:str, username:str, password:str):
                 #  ]
     return url_option
 
-def read_m3u(m3u_url:str)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
+def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
     """Reads an extended M3U file and returns a list of media entries."""
     media_list = []
     m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
     if m3u_playlist:
         logger.info("Returning cached m3u_playlist")
+        if st:
+            st.write("Returning cached m3u_playlist")
         return m3u_playlist
     try:
         with tempfile.NamedTemporaryFile(prefix="vod") as tmpfile:
             logger.debug(f"Beginning download of m3u")
+            if st:
+                logger.debugst.write(f"Beginning download of m3u")
             download_regular_file(tmpfile.name, m3u_url)
             logger.debug(f"Completed download of m3u, Parsing m3u file")
+            if st:
+                logger.debugst.write(f"Completed download of m3u, Parsing m3u file")
             m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
             logger.debug(f"Completed parsing m3u file")
+            if st:
+                logger.debugst.write(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
             dc.set(key=m3u_url,value= m3u_playlist,expire=86400)
             return m3u_playlist
@@ -221,7 +230,7 @@ def read_m3u(m3u_url:str)->M3UPlaylist: #->List[iptvdb.IPTVTbl]:
     raise Exception("Failed to read M3U file")
 
 
-def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
+def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:streamlit=None):
     """Updates iptvd database with the contents of an M3U file from url
 
     Args:
@@ -245,25 +254,33 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
                                         last_updated=datetime.now(),
                                         enabled=True)
         logger.debug(f"Wrote Provider to table {provider_base_url}")
+        if st:
+            st.write(f"Wrote Provider to table {provider_base_url}")
     else:
         provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==provider_base_url)
 
     m3u_url = provider_object.get_m3u_url()
     logger.debug(f"Fetched m3u url {m3u_url}")
+    if st:
+        st.write(f"Fetched m3u url {m3u_url}")
 
     try:
         start=currenttimemillis()
-        media_list:M3UPlaylist = read_m3u(m3u_url)
+        media_list:M3UPlaylist = read_m3u(m3u_url, st)
         finish=currenttimemillis()
         logger.debug(f"M3u fetch took {finish - start}ms")
+        st.write(f"M3u fetch took {finish - start}ms")
         start=currenttimemillis()
         for chan in media_list:
             chan.attributes["provider"] = provider_base_url
         finish=currenttimemillis()
         logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
+        st.write(f"Adding provider to all M3U Channels took {finish - start}ms")
     except ipytv.exceptions.URLException as e:
         print(e)
+        st.write(e)
         print("Failed to read m3u file")
+        st.write("Failed to read m3u file")
         raise e
     except Exception as e:
         print("Unknown error",e)
@@ -272,6 +289,7 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
     # select records where provider is iptv_provider
     first_run = iptvdb.IPTVTbl.select().where(iptvdb.IPTVTbl.provider == provider_base_url).count( ) == 0
     logger.debug(f"Checked if IPTVTbl has no records for this provider: {first_run}")
+    st.write(f"Checked if IPTVTbl has no records for this provider: {first_run}")
     
     if first_run:
         records=[]
@@ -281,15 +299,21 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
         records = create_iptvdbtbl_objects_threaded(media_list, provider_object)
         finish=currenttimemillis()
         logger.debug(f"Finished writing in {(finish-start)}")
+        st.write(f"Finished writing in {(finish-start)}")
         finish=currenttimemillis()
         logger.debug(f"Created list of IPTVTbl records, len:{len(records)}")
+        st.write(f"Created list of IPTVTbl records, len:{len(records)}")
         start=currenttimemillis()
         finish=currenttimemillis()
         logger.debug(f"Executed bulk create IPTVTbl records:{finish-start}ms")
+        if st:
+            st.write(f"Executed bulk create IPTVTbl records:{finish-start}ms")
         
     else:
         records=[]
         logger.debug(f"IPTVTbl records exist, updating missing items")
+        if st:
+            st.write(f"IPTVTbl records exist, updating missing items")
         existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider==provider_base_url) ]
         item_dict = {}
         for item in media_list:
@@ -307,10 +331,16 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str):
         with write_lock:
             iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
             logger.debug(f"Added rows: {len(records)}")
+            if st:
+                st.write(f"Added rows: {len(records)}")
             rows_deleted = iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url << to_be_deleted).execute()
             logger.debug(f"Deleted rows: {rows_deleted}")
+            if st:
+                st.write(f"Deleted rows: {rows_deleted}")
         finish=currenttimemillis()
         logger.debug(f"Completed update of IPTVTbl in {finish-start}ms")
+        if st:
+            st.write(f"Completed update of IPTVTbl in {finish-start}ms")
 
 def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object):
     mp = multiprocessing.Pool()
@@ -372,7 +402,7 @@ def download_large_file(target_file_name:str, url:str):
                 f.write(chunk)
     
 def download_regular_file(target_file_name:str, url:str):
-    resp = requests.get(url, headers={'User-Agent':"Chrome"})
+    resp = requests.get(url, headers={'User-Agent':"Chrome"},timeout=120)
     resp.raise_for_status()
     with open(target_file_name, 'wb') as f:
         f.write(resp.content)
