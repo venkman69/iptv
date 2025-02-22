@@ -19,7 +19,8 @@ def create_all():
     db_proxy.create_tables([IPTVTbl, VideoStreamTbl, HistoryTbl, IPTVProviderTbl])
 
 class IPTVProviderTbl(BaseModel):
-    provider = CharField(primary_key=True)
+    provider_site= CharField(null=True) # friendly name
+    provider_m3u_base = CharField(primary_key=True)
     # m3u_url can contain tokens such as {username} and {password}
     m3u_url = CharField(null=True) 
     username = CharField(null=True)
@@ -34,14 +35,14 @@ class IPTVProviderTbl(BaseModel):
 
     def get_m3u_url(self):
         url = self.m3u_url
-        url = url.replace("{provider}", self.provider)
+        url = url.replace("{provider}", self.provider_m3u_base)
         if self.username:
             url = url.replace("{username}", self.username)
         if self.password:
             url = url.replace("{password}", self.password)
         return url
     def get_any_url(self,url):
-        url = url.replace("{provider}", self.provider)
+        url = url.replace("{provider}", self.provider_m3u_base)
         if self.username:
             url = url.replace("{username}", self.username)
         if self.password:
@@ -53,7 +54,7 @@ class IPTVProviderTbl(BaseModel):
         return url
 
 class IPTVTbl(BaseModel):
-    provider = ForeignKeyField(IPTVProviderTbl,field="provider", on_delete='CASCADE')
+    provider_m3u_base = ForeignKeyField(IPTVProviderTbl,field=IPTVProviderTbl.provider_m3u_base, on_delete='CASCADE')
     url = CharField(unique=True)
     title = CharField(null=True)
     original_title = CharField(null=True)
@@ -63,9 +64,7 @@ class IPTVTbl(BaseModel):
     logo = CharField(null=True) 
 
     def get_from_m3u_channel_object(self, channel_object:IPTVChannel, provider:IPTVProviderTbl):
-        self.provider = channel_object.attributes.get("provider",None)
-        if self.provider == None:
-            raise ValueError("Provider not found")
+        self.provider_m3u_base = provider.provider_m3u_base
         #get provider object
         # parse the url and retrieve the filename from channel_object.url
         self.url = provider.tokenize_channel_url(channel_object.url)
@@ -83,7 +82,7 @@ class IPTVTbl(BaseModel):
 
 class VideoStreamTbl(BaseModel):
     # use the fields from MyMediaInfo
-    url = ForeignKeyField(IPTVTbl, field="url", on_delete='CASCADE')
+    url = ForeignKeyField(IPTVTbl, field=IPTVTbl.url, on_delete='CASCADE')
     media_info_json_str = CharField(null=True)
 
     def save(self, *args, **kwargs):

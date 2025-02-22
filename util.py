@@ -155,7 +155,7 @@ def get_media_info(url)->MyMediaInfo:
     # read a 2MB chunk
     chunk_size = 1024 * 1024 * 2
     iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==url)
-    provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
+    provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider_m3u_base==iptv_obj.provider_m3u_base)
     vid_stream_data, was_created=iptvdb.VideoStreamTbl.get_or_create(url=url)
     authenticated_url=provider_obj.get_any_url(url)
     if was_created:
@@ -233,10 +233,11 @@ def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTb
     raise Exception("Failed to read M3U file")
 
 
-def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:streamlit=None):
+def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, password:str, st:streamlit=None):
     """Updates iptvd database with the contents of an M3U file from url
 
     Args:
+        provider_site (str): iptv provider main site
         provider_base_url (str): iptv provider 
         username (str): _description_
         password (str): _description_
@@ -248,19 +249,22 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:strea
     write_lock = threading.Lock()
 
     start=currenttimemillis()
-    if iptvdb.IPTVProviderTbl.select().where(
-        iptvdb.IPTVProviderTbl.provider == provider_base_url).count() == 0:
+    provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider_m3u_base==provider_m3u_base)
+    if provider_object is None:
+        provider_object:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl()
+        provider_object.provider_site=provider_site
+        provider_object.provider_m3u_base=provider_m3u_base
+        provider_object.username=username
+        provider_object.password=password
+        provider_object.last_updated=datetime.now()
+        provider_object.enabled=True
         with write_lock:
-            provider_object:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.create(provider=provider_base_url,
-                                        username=username, 
-                                        password=password,
-                                        last_updated=datetime.now(),
-                                        enabled=True)
-        logger.debug(f"Wrote Provider to table {provider_base_url}")
+            provider_object.save()
+
+        logger.debug(f"Wrote Provider to table {provider_m3u_base}")
         if st:
-            st.write(f"Wrote Provider to table {provider_base_url}")
-    else:
-        provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==provider_base_url)
+            st.write(f"Wrote Provider to table {provider_m3u_base}")
+
 
     m3u_url = provider_object.get_m3u_url()
     logger.debug(f"Fetched m3u url {m3u_url}")
@@ -275,7 +279,7 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:strea
         st.write(f"M3u fetch took {finish - start}ms")
         start=currenttimemillis()
         for chan in media_list:
-            chan.attributes["provider"] = provider_base_url
+            chan.attributes["provider"] = provider_m3u_base
         finish=currenttimemillis()
         logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
         st.write(f"Adding provider to all M3U Channels took {finish - start}ms")
@@ -290,7 +294,7 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:strea
         raise e
 
     # select records where provider is iptv_provider
-    first_run = iptvdb.IPTVTbl.select().where(iptvdb.IPTVTbl.provider == provider_base_url).count( ) == 0
+    first_run = iptvdb.IPTVTbl.select().where(iptvdb.IPTVTbl.provider_m3u_base == provider_m3u_base).count( ) == 0
     logger.debug(f"Checked if IPTVTbl has no records for this provider: {first_run}")
     st.write(f"Checked if IPTVTbl has no records for this provider: {first_run}")
     
@@ -317,7 +321,7 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:strea
         logger.debug(f"IPTVTbl records exist, updating missing items")
         if st:
             st.write(f"IPTVTbl records exist, updating missing items")
-        existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider==provider_base_url) ]
+        existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider_m3u_base==provider_m3u_base) ]
         item_dict = {}
         for item in media_list:
             if not ( "series" in item.url or "movie" in item.url):
@@ -345,7 +349,7 @@ def update_iptvdb_tbl(provider_base_url:str,username:str, password:str, st:strea
         if st:
             st.write(f"Completed update of IPTVTbl in {finish-start}ms")
 
-def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object):
+def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:iptvdb.IPTVProviderTbl):
     mp = multiprocessing.Pool()
     input_items = []
     records = []
@@ -378,7 +382,8 @@ def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object):
     return records
 
 def threaded_iptvobj_creator(args):
-    item, provider_object = args
+    item, provider_object= args
+    provider_object:iptvdb.IPTVProviderTbl 
     iptvobj = iptvdb.IPTVTbl()
     iptvobj.get_from_m3u_channel_object(item, provider_object)
     # logger.debug(f"Created IPTVTbl object for {iptvobj.url}")

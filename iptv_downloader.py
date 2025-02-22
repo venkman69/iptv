@@ -39,22 +39,6 @@ st.set_page_config(page_title="IPTV Downloader", page_icon=":tv:", layout="wide"
 
 st.title("IPTV Downloader")
 
-# with st.sidebar:
-    # if st.button("Clear Cache"):
-    #     st.cache_data.clear()
-    #     print("Cache Cleared")
-    #     del st.session_state["media_list"]
-    # m3u_url = st.text_input("Enter the URL of the m3u file")
-    # if st.button("Download m3u file"):
-    #     dl_prog = st.progress(0)
-    #     for prog in download_large_file(VOD_FILE, m3u_url):
-    #         dl_prog.progress(prog)
-    #     del st.session_state["media_list"]
-        # with requests.get(m3u_url, stream=True,) as r:
-        #     with open("vod.m3u", 'wb') as f:
-        #         shutil.copyfileobj(r.raw, f)
-
-
 
 tabs = ["Media Downloader", "M3u Manager"]
 tab_dl, tab_m3u_mgr=st.tabs(tabs)
@@ -68,7 +52,7 @@ groups = st.session_state.groups
 
 with st.sidebar:
     # Create Streamlit widgets for group and language selection, and title search
-    providers =["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()]
+    providers =["All"] + [rec.provider_m3u_base for rec in iptvdb.IPTVProviderTbl.select()]
     selected_provider = st.selectbox("Select Provider",providers)
     selected_media_type = st.selectbox("Select Media Type", ["All", "movie", "series", "livetv"])
     where_clause = (1==1)
@@ -181,13 +165,21 @@ with tab_m3u_mgr:
     st.header("M3U Manager")
     if "providers" not in st.session_state:
         # Logic to refresh providers
-        st.session_state.providers = ["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()]
+        st.session_state.providers = [rec.provider_m3u_base for rec in iptvdb.IPTVProviderTbl.select()]
 
     # Display the list of providers
-    providers = st.session_state.get("providers", ["All"] + [rec.provider for rec in iptvdb.IPTVProviderTbl.select()])
+    providers = st.session_state.get("providers", ["All"] + [rec.provider_m3u_base for rec in iptvdb.IPTVProviderTbl.select()])
     selected_provider = st.selectbox("Provider to Refresh",providers)
     st.write(f"Selected Provider: {selected_provider}")
     if st.button("Refresh"):
         # provider_info:iptvdb.IPTVProviderTbl= iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider == selected_provider)
         with st.spinner():
-            update_iptvdb_tbl(selected_provider,None,None, st)
+            update_iptvdb_tbl(selected_provider,None, None,None, st)
+    
+    st.write("Add Provider")
+    provider_site     = st.text_input("Provider Site (ex: http://tivistation.com)")
+    provider_base_url = st.text_input("Provider Base URL (ex: http://tivistation.cc:80)")
+    provider_username = st.text_input("Username")
+    provider_password = st.text_input("Password")
+    if st.button("Import Provider Playlist"):
+        update_iptvdb_tbl(provider_base_url,provider_site, provider_username,provider_password, st)
