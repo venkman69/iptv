@@ -130,8 +130,11 @@ class MyMediaInfo(object):
     def __get_audio(self):
         recs = []
         for track in self.audio:
-            lang = Language.get(track['language']).display_name()
-            recs.append(f"({track['audio_channels']}:{lang})")
+            try:
+                lang = Language.get(track['language']).display_name()
+                recs.append(f"({track['audio_channels']}:{lang})")
+            except:
+                recs.append(f"({track['audio_channels']}:{track['language']})")
         return " | ".join(recs)
     def __get_subtitles(self):
         recs = []
