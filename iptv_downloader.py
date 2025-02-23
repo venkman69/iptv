@@ -20,6 +20,7 @@ from streamlit_option_menu import option_menu   # pip install streamlit-option-m
 import iptvdb
 from peewee import SqliteDatabase
 from playhouse.shortcuts import model_to_dict
+from datetime import datetime
 
 WORK_DIR="./work"
 if not os.path.exists(WORK_DIR):
@@ -128,37 +129,49 @@ with tab_dl:
             show_details_df = pd.DataFrame(details)
             st.data_editor(show_details_df)
 
-            if st.button("Download Selected Items"):
+            if st.button("Add selected items to download queue"):
+                for item in selected_items.itertuples():
+                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.URL)
+                    if iptv_obj:
+                        created_date = datetime.now()
+                        download_mgr_obj = iptvdb.DownloadQueueTbl.create(created_date = created_date,
+                                                                          updated_date = created_date,
+                                                                           url = iptv_obj.url,
+                                                                            file_path = iptv_obj.get_target_filename(MOVIE_DOWNLOAD_PATH,SERIES_DOWNLOAD_PATH),
+                                                                             state = iptvdb.DownloadStates.PENDING )
+                    else:
+                        raise ValueError(f"IPTVTbl object not found for {item.URL}")
+
                 # show a progress bar for each download
-                empty_space = st.empty()
-                with empty_space.container():
-                    counter = 0
-                    max = len(selected_items)
-                    dl_progress = st.progress(0)
-                    for item in selected_items.itertuples():
-                        dl_progress.progress(counter / max)
-                        iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==item.URL)
-                        provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider_m3u_base==iptv_obj.provider_m3u_base)
-                        authenticated_url=provider_obj.get_any_url(item.URL)
-                        st.write(f"Downloading {item.Title} {authenticated_url}...")
-                        file_extn = item.URL.split('.')[-1]
-                        if iptv_obj.media_type == "movie":
-                            target_file_name = Path(MOVIE_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
-                        if iptv_obj.media_type == "series":
-                            target_file_name = Path(SERIES_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+    #             empty_space = st.empty()
+    #             with empty_space.container():
+    #                 counter = 0
+    #                 max = len(selected_items)
+    #                 dl_progress = st.progress(0)
+    #                 for item in selected_items.itertuples():
+    #                     dl_progress.progress(counter / max)
+    #                     iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==item.URL)
+    #                     provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
+    #                     authenticated_url=provider_obj.get_any_url(item.URL)
+    #                     st.write(f"Downloading {item.Title} {authenticated_url}...")
+    #                     file_extn = item.URL.split('.')[-1]
+    #                     if iptv_obj.media_type == "movie":
+    #                         target_file_name = Path(MOVIE_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
+    #                     if iptv_obj.media_type == "series":
+    #                         target_file_name = Path(SERIES_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
                         
-                        if target_file_name.exists():
-                            st.write(f"Not Downloading {item.Title} as Target file exists: {target_file_name}")
-                        else:
-                            file_dl_progress= st.progress(0)
-                            for prog in download_large_file(target_file_name, authenticated_url):
-                                file_dl_progress.progress(prog)
-                            file_dl_progress.empty()
-                            counter += 1
-                        # Add your download logic here
-                empty_space.empty()
-                st.write(f"Download completed : {counter} items")
-    else:
+    #                     if target_file_name.exists():
+    #                         st.write(f"Not Downloading {item.Title} as Target file exists: {target_file_name}")
+    #                     else:
+    #                         file_dl_progress= st.progress(0)
+    #                         for prog in download_large_file(target_file_name, authenticated_url):
+    #                             file_dl_progress.progress(prog)
+    #                         file_dl_progress.empty()
+    #                         counter += 1
+    #                     # Add your download logic here
+    #             empty_space.empty()
+    #             st.write(f"Download completed : {counter} items")
+    # else:
         st.write("Enter a search title to filter the media list")
 
 with tab_m3u_mgr:

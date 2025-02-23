@@ -1,11 +1,13 @@
 import json
 from urllib.parse import urlparse
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
-                    IntegerField, Model, Database, ForeignKeyField
+                    IntegerField, Model, Database, ForeignKeyField,
+                    FloatField
                     )
 from ipytv.channel import IPTVChannel
 from langcodes import *
 import logging
+from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +18,7 @@ class BaseModel(Model):
         database = db_proxy
 
 def create_all():
-    db_proxy.create_tables([IPTVTbl, VideoStreamTbl, HistoryTbl, IPTVProviderTbl])
+    db_proxy.create_tables([IPTVTbl, VideoStreamTbl, HistoryTbl, IPTVProviderTbl,DownloadQueueTbl])
 
 class IPTVProviderTbl(BaseModel):
     provider_site= CharField(null=True) # friendly name
@@ -79,6 +81,35 @@ class IPTVTbl(BaseModel):
         else:
             self.media_type = "livetv"
         self.logo = channel_object.attributes.get("tvg-logo",None)
+    
+    def get_target_filename(self,movie_path:str, series_path:str):
+
+        file_extn = self.url.split('.')[-1]
+        if self.media_type == "movie":
+            target_file_name = Path(movie_path) / f"{self.title}.{file_extn}"
+        if self.media_type == "series":
+            target_file_name = Path(series_path) / f"{self.title}.{file_extn}"
+        return target_file_name
+    
+    def get_authenticated_url_old(self):
+        provider_obj = IPTVProviderTbl.get_or_none(IPTVProviderTbl.provider_m3u_base==self.provider_m3u_base)
+        if provider_obj:
+            url = self.url.replace("{provider}", provider_obj.provider_m3u_base)
+            url = url.replace("{username}", provider_obj.username)
+            url = url.replace("{password}", provider_obj.password)
+            return url
+        else:
+            raise ValueError(f"Provider {self.provider_m3u_base} not found")
+    def get_authenticated_url(self):
+        provider_obj = self.provider_m3u_base
+        if provider_obj:
+            url = self.url.replace("{provider}", provider_obj.provider_m3u_base)
+            url = url.replace("{username}", provider_obj.username)
+            url = url.replace("{password}", provider_obj.password)
+            return url
+        else:
+            raise ValueError(f"Provider {self.provider_m3u_base} not found")
+
 
 class VideoStreamTbl(BaseModel):
     # use the fields from MyMediaInfo
@@ -94,6 +125,24 @@ class VideoStreamTbl(BaseModel):
         if type(self.media_info_json_str) == str:
             return json.loads(self.media_info_json_str)
         return self.media_info_json_str
+
+class DownloadQueueTbl(BaseModel):
+    created_date = DateTimeField(null=True)
+    updated_date = DateTimeField(null=True)
+    url = ForeignKeyField(IPTVTbl, field=IPTVTbl.url, on_delete='CASCADE')
+    file_path = CharField() #target file path
+    state = CharField()  # one of ['pending', 'in_progress','complete','failed']
+    progress = FloatField(null=True) # a percentage
+    eta = IntegerField(null=True)  # number of seconds to completion
+    failure_message=CharField(null=True) # if failed, cause of failure
+    file_size = IntegerField(null=True) #filesize in bytes
+
+class DownloadStates:
+    PENDING="pending"
+    IN_PROGRESS='in_progress'
+    COMPLETE='complete'
+    FAILED='failed'
+
 
 class HistoryTbl(BaseModel):
     message = CharField()
