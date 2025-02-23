@@ -27,7 +27,7 @@ checkpid(){
         fi
     fi
 }
-createvenv(){
+makevenv(){
     if [ ! -d venv ]
     then
         python3 -m venv venv
@@ -42,7 +42,7 @@ rebuild() {
 
 start(){
 
-    createvenv
+    makevenv
     checkpid
     git pull
     . ./venv/bin/activate
@@ -61,6 +61,10 @@ fi
     if [ "$1" = "restart" ]
     then
         killpid
+    fi
+    if [ "$1" = "makevenv" ]
+    then
+        makevenv
     fi
     if [ "$1" = "rebuild" ]
     then
