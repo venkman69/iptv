@@ -1,14 +1,15 @@
-#!/bin/bash -x
+#!/bin/bash
 cd /home/venkman/git/iptv
+pidfile='.iptvdlmgr.pid'
 killpid(){
-    if [ -f .iptv.pid ]
+    if [ -f $pidfile ]
     then
-        psid=`cat .iptv.pid`
+        psid=`cat $pidfile`
         kill  $psid
         if [ $? -eq 0 ]
         then
             echo "Process killed"
-            rm .iptv.pid
+            rm $pidfile
         else
             echo "Process did not die"
             exit 1
@@ -16,9 +17,9 @@ killpid(){
     fi
 }
 checkpid(){
-    if [ -f .iptv.pid ]
+    if [ -f $pidfile ]
     then
-        psid=`cat .iptv.pid`
+        psid=`cat $pidfile`
         ps -p $psid >/dev/null
         if [ $? -eq 0 ]
         then
@@ -47,8 +48,8 @@ start(){
     git pull
     . ./venv/bin/activate
     pip install -r requirements.txt
-    ./venv/bin/streamlit run iptv_downloader.py --server.address="0.0.0.0" --server.port=8503 --server.headless true --server.enableCORS=false --server.baseUrlPath=/iptv &
-    echo $! > .iptv.pid
+    ./venv/bin/python download_mgr.py &
+    echo $! > $pidfile
 
 }
 
@@ -73,5 +74,5 @@ fi
 
     start
 
-}>>rundash.log 2>&1
+}>>rundlmgr.log 2>&1
 
