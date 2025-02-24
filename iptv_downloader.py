@@ -9,7 +9,6 @@ import re
 import time
 from typing import List
 
-from numpy import empty, where
 import streamlit as st
 import pandas as pd
 import os
@@ -41,8 +40,8 @@ st.set_page_config(page_title="IPTV Downloader", page_icon=":tv:", layout="wide"
 st.title("IPTV Downloader")
 
 
-tabs = ["Media Downloader", "M3u Manager"]
-tab_dl, tab_m3u_mgr=st.tabs(tabs)
+tabs = ["Media Downloader","Download Progress", "M3u Manager"]
+tab_dl, tab_dl_mgr, tab_m3u_mgr=st.tabs(tabs)
 
 if not "mediatypes" in st.session_state:
     st.session_state.mediatypes = ["All"]+[rec.media_type for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.media_type).distinct()]
@@ -51,25 +50,26 @@ if not "groups" in st.session_state:
 
 groups = st.session_state.groups
 
-with st.sidebar:
-    # Create Streamlit widgets for group and language selection, and title search
-    providers =["All"] + [rec.provider_m3u_base for rec in iptvdb.IPTVProviderTbl.select()]
-    selected_provider = st.selectbox("Select Provider",providers)
-    selected_media_type = st.selectbox("Select Media Type", ["All", "movie", "series", "livetv"])
-    where_clause = (1==1)
-    if selected_provider != "All":
-        where_clause = (where_clause & ( iptvdb.IPTVTbl.provider_m3u_base == selected_provider) )
-    if selected_media_type != "All":
-        where_clause = (where_clause & ( iptvdb.IPTVTbl.media_type == selected_media_type) )
-    # groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(
-    #         (iptvdb.IPTVTbl.media_type==selected_media_type) & 
-    #         ( iptvdb.IPTVTbl.provider == selected_provider)
-    #     )]
-    groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(where_clause)]
-
-    selected_group = st.selectbox("Select Group", ["All"] + groups)
-    search_title = st.text_input("Search Title").lower()
+# with st.sidebar:
 with tab_dl:
+    # Create Streamlit widgets for group and language selection, and title search
+    stcol1, stcol2, stcol3=st.columns(3)
+    with stcol1:
+        providers =["All"] + [rec.provider_m3u_base for rec in iptvdb.IPTVProviderTbl.select()]
+        selected_provider = st.selectbox("Select Provider",providers)
+    with stcol2:
+        selected_media_type = st.selectbox("Select Media Type", ["All", "movie", "series", "livetv"])
+    with stcol3:
+        where_clause = (1==1)
+        if selected_provider != "All":
+            where_clause = (where_clause & ( iptvdb.IPTVTbl.provider_m3u_base == selected_provider) )
+        if selected_media_type != "All":
+            where_clause = (where_clause & ( iptvdb.IPTVTbl.media_type == selected_media_type) )
+        groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(where_clause)]
+        selected_group = st.selectbox("Select Group", ["All"] + groups)
+    
+    search_title = st.text_input("Search Title").lower()
+    st.divider()
     where_clauses = [(1 == 1)]
     if selected_provider != "All":
         where_clauses.append((iptvdb.IPTVTbl.provider_m3u_base == selected_provider ))
@@ -106,7 +106,9 @@ with tab_dl:
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
-            download_items_df = st.data_editor(filtered_media_df, column_config={"Download": st.column_config.CheckboxColumn(default=False)})
+            download_items_df = st.data_editor(filtered_media_df, 
+                                               column_config={"Download": st.column_config.CheckboxColumn(default=False)},
+                                               key="search_results")
 
         selected_items = download_items_df[download_items_df["Download"] == True]
         if selected_items.empty:
@@ -123,9 +125,11 @@ with tab_dl:
                     media_info:MyMediaInfo = selected_items_details[item.URL]
                 else:
                     media_info:MyMediaInfo = get_media_info(item.URL)
+                    selected_items_details[item.URL] = media_info
                 rec={"Title":item.Title}
                 rec.update(media_info.to_dict())
                 details.append(rec)
+            st.session_state["selected_item_details"]=selected_items_details
             show_details_df = pd.DataFrame(details)
             st.data_editor(show_details_df)
 
@@ -141,38 +145,30 @@ with tab_dl:
                                                                              state = iptvdb.DownloadStates.PENDING )
                     else:
                         raise ValueError(f"IPTVTbl object not found for {item.URL}")
+                st.write("Submitted dl queue")
 
-                # show a progress bar for each download
-    #             empty_space = st.empty()
-    #             with empty_space.container():
-    #                 counter = 0
-    #                 max = len(selected_items)
-    #                 dl_progress = st.progress(0)
-    #                 for item in selected_items.itertuples():
-    #                     dl_progress.progress(counter / max)
-    #                     iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==item.URL)
-    #                     provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider==iptv_obj.provider)
-    #                     authenticated_url=provider_obj.get_any_url(item.URL)
-    #                     st.write(f"Downloading {item.Title} {authenticated_url}...")
-    #                     file_extn = item.URL.split('.')[-1]
-    #                     if iptv_obj.media_type == "movie":
-    #                         target_file_name = Path(MOVIE_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
-    #                     if iptv_obj.media_type == "series":
-    #                         target_file_name = Path(SERIES_DOWNLOAD_PATH) / f"{item.Title}.{file_extn}"
-                        
-    #                     if target_file_name.exists():
-    #                         st.write(f"Not Downloading {item.Title} as Target file exists: {target_file_name}")
-    #                     else:
-    #                         file_dl_progress= st.progress(0)
-    #                         for prog in download_large_file(target_file_name, authenticated_url):
-    #                             file_dl_progress.progress(prog)
-    #                         file_dl_progress.empty()
-    #                         counter += 1
-    #                     # Add your download logic here
-    #             empty_space.empty()
-    #             st.write(f"Download completed : {counter} items")
-    # else:
+                del st.session_state[search_cache_key]
+                selected_items = download_items_df[download_items_df["Download"] == True]
+                print(download_items_df)
+                try:
+                    for row in selected_items.itertuples():
+                        row["Download"] = False
+                except Exception as e:
+                    print(e)
+
         st.write("Enter a search title to filter the media list")
+
+with tab_dl_mgr:
+    st.header("Download manager")
+    tab_pending, tab_history=st.tabs(["pending",'history'])
+    with tab_pending:
+        pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state != iptvdb.DownloadStates.COMPLETE).dicts())
+        newlist=[]
+        for item in pending_items:
+            rec = {k:v for k,v in item.items() if k != "url"}
+            newlist.append(rec)
+        pd_pending=pd.DataFrame(newlist)
+        st.data_editor(pd_pending,key="pd_pending")
 
 with tab_m3u_mgr:
     st.header("M3U Manager")
