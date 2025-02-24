@@ -1,3 +1,5 @@
 .history
 venv
 __pycache__
+work/*
+iptv_downloader.ini
