@@ -51,7 +51,7 @@ class MyMediaInfo(object):
         self.audio = []
         self.subtitles = []
 
-        for track in media_info["tracks"]:
+        for track in media_info.get("tracks"):
             if track["track_type"] == 'General':
                 format = track.get("format")
                 duration = track.get("duration", "0")
