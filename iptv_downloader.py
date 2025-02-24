@@ -40,8 +40,8 @@ st.set_page_config(page_title="IPTV Downloader", page_icon=":tv:", layout="wide"
 st.title("IPTV Downloader")
 
 
-tabs = ["Media Downloader","Download Progress", "M3u Manager"]
-tab_dl, tab_dl_mgr, tab_m3u_mgr=st.tabs(tabs)
+tabs = ["Media Downloader","Download Progress", "History", "M3u Manager"]
+tab_dl, tab_dl_mgr, tab_history, tab_m3u_mgr=st.tabs(tabs)
 
 if not "mediatypes" in st.session_state:
     st.session_state.mediatypes = ["All"]+[rec.media_type for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.media_type).distinct()]
@@ -160,15 +160,23 @@ with tab_dl:
 
 with tab_dl_mgr:
     st.header("Download manager")
-    tab_pending, tab_history=st.tabs(["pending",'history'])
-    with tab_pending:
-        pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state != iptvdb.DownloadStates.COMPLETE).dicts())
-        newlist=[]
-        for item in pending_items:
-            rec = {k:v for k,v in item.items() if k != "url"}
-            newlist.append(rec)
-        pd_pending=pd.DataFrame(newlist)
-        st.data_editor(pd_pending,key="pd_pending")
+    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state != iptvdb.DownloadStates.COMPLETE).dicts())
+    newlist=[]
+    for item in pending_items:
+        rec = {k:v for k,v in item.items() if k != "url"}
+        newlist.append(rec)
+    pd_pending=pd.DataFrame(newlist)
+    st.data_editor(pd_pending,key="pd_pending")
+
+with tab_history:
+    st.header("Download History")
+    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state == iptvdb.DownloadStates.COMPLETE).dicts())
+    newlist=[]
+    for item in pending_items:
+        rec = {k:v for k,v in item.items() if k != "url"}
+        newlist.append(rec)
+    pd_pending=pd.DataFrame(newlist)
+    st.data_editor(pd_pending)
 
 with tab_m3u_mgr:
     st.header("M3U Manager")
