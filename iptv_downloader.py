@@ -96,18 +96,26 @@ with tab_dl:
             st.write("No media found matching the selected criteria.")
             st.write(filtered_media)
         else:
-            filtered_media_df = pd.DataFrame([
-            {"Title": item.original_title, "Group": item.group, "Type": item.media_type, "URL": item.url}
-            for item in filtered_media
-            ])
+            # filtered_media_df = pd.DataFrame([
+            # {"Title": item.original_title, "Group": item.group, "Type": item.media_type, "URL": item.url}
+            # for item in filtered_media
+            # ])
+            filtered_media_df = list(filtered_media.dicts())
+            redacted_filtered_media=[]
+            for item in filtered_media_df:
+                rec = {k:v for k,v in item.items() if k in ["url","media_type","group","original_title","logo"]}
+                redacted_filtered_media.append(rec)
+            filtered_media_df = pd.DataFrame(redacted_filtered_media)
             filtered_media_df["Download"] = False
             # reorder filtered_media_df column so that Download is at the beginning
-            cols = ["Download"] + [col for col in filtered_media_df.columns if col != "Download"]
+            cols = ["Download","logo","original_title","group","media_type","url"]
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
-            download_items_df = st.data_editor(filtered_media_df, 
-                                               column_config={"Download": st.column_config.CheckboxColumn(default=False)},
+            download_items_df = st.data_editor(filtered_media_df,
+                                               column_config={"Download": st.column_config.CheckboxColumn(default=False),
+                                                              "url":None,
+                                                              "logo":st.column_config.ImageColumn()},
                                                key="search_results")
 
         selected_items = download_items_df[download_items_df["Download"] == True]
@@ -121,12 +129,12 @@ with tab_dl:
                 selected_items_details = {}
             details=[]
             for item in selected_items.itertuples():
-                if item.URL in selected_items_details:
-                    media_info:MyMediaInfo = selected_items_details[item.URL]
+                if item.url in selected_items_details:
+                    media_info:MyMediaInfo = selected_items_details[item.url]
                 else:
-                    media_info:MyMediaInfo = get_media_info(item.URL)
-                    selected_items_details[item.URL] = media_info
-                rec={"Title":item.Title}
+                    media_info:MyMediaInfo = get_media_info(item.url)
+                    selected_items_details[item.url] = media_info
+                rec={"title":item.original_title}
                 rec.update(media_info.to_dict())
                 details.append(rec)
             st.session_state["selected_item_details"]=selected_items_details
@@ -135,7 +143,7 @@ with tab_dl:
 
             if st.button("Add selected items to download queue"):
                 for item in selected_items.itertuples():
-                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.URL)
+                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.url)
                     if iptv_obj:
                         created_date = datetime.now()
                         download_mgr_obj = iptvdb.DownloadQueueTbl.create(created_date = created_date,
@@ -144,7 +152,7 @@ with tab_dl:
                                                                             file_path = iptv_obj.get_target_filename(MOVIE_DOWNLOAD_PATH,SERIES_DOWNLOAD_PATH),
                                                                              state = iptvdb.DownloadStates.PENDING )
                     else:
-                        raise ValueError(f"IPTVTbl object not found for {item.URL}")
+                        raise ValueError(f"IPTVTbl object not found for {item.url}")
                 st.write("Submitted dl queue")
 
                 del st.session_state[search_cache_key]
@@ -170,7 +178,7 @@ with tab_dl_mgr:
 
 with tab_history:
     st.header("Download History")
-    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state == iptvdb.DownloadStates.COMPLETE).dicts())
+    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state == iptvdb.DownloadStates.COMPLETE).order_by(iptvdb.DownloadQueueTbl.created_date.desc()).dicts())
     newlist=[]
     for item in pending_items:
         rec = {k:v for k,v in item.items() if k != "url"}

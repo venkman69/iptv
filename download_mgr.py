@@ -41,6 +41,7 @@ def process_download_queue():
                 download.eta = remainder / speed # seconds
                 download.progress = f"{prog * 100:.2f}"
                 download.file_size=Path(download.file_path).stat().st_size
+                download.updated_date = datetime.now()
                 download.save()
 
             finish=currenttimemillis() 
