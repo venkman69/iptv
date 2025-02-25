@@ -201,6 +201,29 @@ with tab_m3u_mgr:
         with st.spinner():
             update_iptvdb_tbl(selected_provider,None, None,None, st)
     
+    st.divider()
+    if "delproviders" not in st.session_state:
+        # Logic to refresh providers
+        st.session_state.delproviders = list(iptvdb.IPTVProviderTbl.select().dicts())
+    delproviders = st.session_state.delproviders
+    delprovider_df=pd.DataFrame(delproviders)
+    delprovider_df["Delete"] = False
+    selected_del_items_df=st.data_editor(delprovider_df , column_config={"Delete":st.column_config.CheckboxColumn(default=False)})
+    selected_del_items = selected_del_items_df[selected_del_items_df["Delete"] == True]
+    if selected_del_items.empty:
+        st.write("Nothing is selected")
+    elif len(selected_del_items)==1:
+        selected_del_item_dict = selected_del_items.to_dict(orient='records')[0]
+        provider = selected_del_item_dict['provider_site']
+        st.write(f"Delete>>>:   {provider}")
+        if st.button("Delete"):
+            st.write("Deleting")
+            provider_obj=iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider_site==provider)
+            provider_obj.delete_instance()
+            del st.session_state['delproviders']
+
+
+    st.divider()
     st.write("Add Provider")
     provider_site     = st.text_input("Provider Site (ex: http://tivistation.com)")
     provider_base_url = st.text_input("Provider Base URL (ex: http://tivistation.cc:80)")
