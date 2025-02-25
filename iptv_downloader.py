@@ -168,7 +168,7 @@ with tab_dl:
 
 with tab_dl_mgr:
     st.header("Download manager")
-    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state != iptvdb.DownloadStates.COMPLETE).dicts())
+    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state.in_([iptvdb.DownloadStates.PENDING,iptvdb.DownloadStates.IN_PROGRESS])).dicts())
     newlist=[]
     for item in pending_items:
         rec = {k:v for k,v in item.items() if k != "url"}
@@ -178,7 +178,7 @@ with tab_dl_mgr:
 
 with tab_history:
     st.header("Download History")
-    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state == iptvdb.DownloadStates.COMPLETE).order_by(iptvdb.DownloadQueueTbl.created_date.desc()).dicts())
+    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state.in_([iptvdb.DownloadStates.COMPLETE,iptvdb.DownloadStates.FAILED])).order_by(iptvdb.DownloadQueueTbl.created_date.desc()).dicts())
     newlist=[]
     for item in pending_items:
         rec = {k:v for k,v in item.items() if k != "url"}
