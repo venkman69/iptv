@@ -16,6 +16,7 @@ import requests
 import shutil
 from util import *
 from streamlit_option_menu import option_menu   # pip install streamlit-option-menu
+from streamlit_autorefresh import st_autorefresh
 import iptvdb
 from peewee import SqliteDatabase
 from playhouse.shortcuts import model_to_dict
@@ -168,13 +169,29 @@ with tab_dl:
 
 with tab_dl_mgr:
     st.header("Download manager")
-    pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state.in_([iptvdb.DownloadStates.PENDING,iptvdb.DownloadStates.IN_PROGRESS])).dicts())
-    newlist=[]
-    for item in pending_items:
-        rec = {k:v for k,v in item.items() if k != "url"}
-        newlist.append(rec)
-    pd_pending=pd.DataFrame(newlist)
-    st.data_editor(pd_pending,key="pd_pending")
+    auto_refresh_toggle=st.toggle("AutoRefresh")
+    
+    def load_pending_items():
+        pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state.in_([iptvdb.DownloadStates.PENDING, iptvdb.DownloadStates.IN_PROGRESS])).dicts())
+        newlist = []
+        for item in pending_items:
+            rec = {k: v for k, v in item.items() if k != "url"}
+            newlist.append(rec)
+        return pd.DataFrame(newlist)
+    
+    if "dl_in_prog" not in st.session_state:
+        st.session_state.dl_in_prog = load_pending_items()
+    
+    dl_in_prog = st.session_state.dl_in_prog
+    
+    st.data_editor(dl_in_prog, key="dl_in_prog")
+    # def refresh_data():
+    #     st.session_state.dl_in_prog = load_pending_items()
+    
+    # st.button("Refresh Now", on_click=refresh_data)
+    if auto_refresh_toggle:
+        st.write(datetime.now())
+        st_autorefresh(interval=10 * 1000, key="data_refresh")
 
 with tab_history:
     st.header("Download History")

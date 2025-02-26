@@ -64,12 +64,17 @@ class IPTVTbl(BaseModel):
     duration = IntegerField(null=True)
     media_type = CharField(null=True)
     logo = CharField(null=True) 
+    added_date = DateTimeField(null=True)
 
     def get_from_m3u_channel_object(self, channel_object:IPTVChannel, provider:IPTVProviderTbl):
-        self.provider_m3u_base = provider.provider_m3u_base
+        # self.provider_m3u_base = provider.provider_m3u_base
+        self.provider_m3u_base = channel_object.attributes.get("provider",None)
+        if self.provider_m3u_base == None:
+            raise ValueError(f"Provider not supplied")
+        self.added_date = channel_object.attributes.get("fetch_time",None)
         #get provider object
         # parse the url and retrieve the filename from channel_object.url
-        self.url = provider.tokenize_channel_url(channel_object.url)
+        self.url = self.provider_m3u_base.tokenize_channel_url(channel_object.url)
         self.title = channel_object.name.lower()
         self.original_title = channel_object.name
         self.group = channel_object.attributes.get("group-title",None)

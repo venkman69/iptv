@@ -252,7 +252,7 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
     """
 
     write_lock = threading.Lock()
-
+    fetch_time = datetime.now()
     start=currenttimemillis()
     provider_object:iptvdb.IPTVProviderTbl=iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider_m3u_base==provider_m3u_base)
     if provider_object is None:
@@ -284,6 +284,7 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         start=currenttimemillis()
         for chan in media_list:
             chan.attributes["provider"] = provider_m3u_base
+            chan.attributes["fetch_time"] = fetch_time
         finish=currenttimemillis()
         logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
         st.write(f"Adding provider to all M3U Channels took {finish - start}ms")
@@ -374,6 +375,8 @@ def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:i
             continue
         if item.url in urls_processed:
             continue
+        item:IPTVChannel
+        item.attributes
         urls_processed.add(item.url)
         input_items.append(item)
         if len(input_items) == chunk:
