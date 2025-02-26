@@ -184,7 +184,7 @@ with tab_dl_mgr:
     
     dl_in_prog = st.session_state.dl_in_prog
     
-    st.data_editor(dl_in_prog, key="dl_in_prog")
+    st.data_editor(dl_in_prog, key="dl_in_prog1")
     # def refresh_data():
     #     st.session_state.dl_in_prog = load_pending_items()
     
