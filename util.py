@@ -155,9 +155,14 @@ def get_media_info(url)->MyMediaInfo:
     # read a 2MB chunk
     chunk_size = 1024 * 1024 * 2
     iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get(iptvdb.IPTVTbl.url==url)
-    provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider_m3u_base==iptv_obj.provider_m3u_base)
+    # provider_obj:iptvdb.IPTVProviderTbl = iptvdb.IPTVProviderTbl.get(iptvdb.IPTVProviderTbl.provider_m3u_base==iptv_obj.provider_m3u_base)
     vid_stream_data, was_created=iptvdb.VideoStreamTbl.get_or_create(url=url)
-    authenticated_url=provider_obj.get_any_url(url)
+    vid_stream_data:iptvdb.VideoStreamTbl
+    authenticated_url=iptv_obj.get_authenticated_url()
+    if not was_created and vid_stream_data.media_info_json_str == None:
+        was_created=True
+        # this will cause to refresh data if it is broken
+        
     if was_created:
         with requests.get(authenticated_url, stream=True,headers={'User-Agent':"Chrome"}) as r:
             r.raise_for_status()
