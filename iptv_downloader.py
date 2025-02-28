@@ -206,11 +206,7 @@ with tab_dl_mgr:
             newlist.append(rec)
         return pd.DataFrame(newlist)
     
-    if "dl_in_prog" not in st.session_state:
-        st.session_state.dl_in_prog = load_pending_items()
-    
-    dl_in_prog = st.session_state.dl_in_prog
-    
+    dl_in_prog = load_pending_items()
     st.data_editor(dl_in_prog, key="dl_in_prog1")
     # def refresh_data():
     #     st.session_state.dl_in_prog = load_pending_items()
