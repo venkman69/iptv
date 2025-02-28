@@ -91,7 +91,7 @@ with tab_dl:
         where_clauses.append((iptvdb.IPTVTbl.media_type == selected_media_type ) )
     if date_picker_toggle:
         where_clauses.append((iptvdb.IPTVTbl.added_date >= date_added_since))
-    where_clauses.append((iptvdb.IPTVTbl.added_date >= date_added_since))
+
     if search_title or selected_group != "All" or selected_media_type != "All" or selected_provider != "All" or date_added_since != (1==1):
         print(f"Provider: {selected_provider} selected_group: {selected_group}, search_title: {search_title}")
         search_cache_key = sha256(f"{date_added_since}{selected_provider}{selected_group}{selected_media_type}{search_title}".encode()).hexdigest()
@@ -107,6 +107,8 @@ with tab_dl:
             filtered_media = iptvdb.IPTVTbl.select().where(*where_clauses).order_by(iptvdb.IPTVTbl.title)
         
             st.session_state[search_cache_key] = filtered_media
+        if st.toggle("Debug SQL"):
+            st.write(filtered_media)
         # display the records in filtered_media as a table
         if not filtered_media:
             st.write("No media found matching the selected criteria.")
