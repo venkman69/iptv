@@ -1,77 +1,91 @@
-#!/bin/bash -x
+#!/bin/bash
 cd /home/venkman/git/iptv
-killpid(){
-    if [ -f .iptv.pid ]
+pidfile='.iptv.pid'
+function stop {
+    if [ -f $pidfile ]
     then
-        psid=`cat .iptv.pid`
+        psid=`cat $pidfile`
         kill  $psid
         if [ $? -eq 0 ]
         then
             echo "Process killed"
-            rm .iptv.pid
+            rm $pidfile
         else
             echo "Process did not die"
             exit 1
         fi
     fi
 }
-checkpid(){
-    if [ -f .iptv.pid ]
+function status {
+    if [ -f $pidfile ]
     then
-        psid=`cat .iptv.pid`
+        psid=`cat $pidfile`
         ps -p $psid >/dev/null
         if [ $? -eq 0 ]
         then
-            echo "Process is still running"
+            echo "Process is still running [$psid]"
             exit
+        else
+            echo "Process is not running"
         fi
+    else
+        echo "Process is not running"
     fi
 }
-makevenv(){
+function makevenv {
     if [ ! -d venv ]
     then
         python3 -m venv venv
     fi
 }
-rebuild() {
-    killpid
+function rebuild {
+    stop
     git pull
     rm -rf venv
     start
 }
 
-start(){
+function start {
 
     makevenv
-    checkpid
+    status
     git pull
     . ./venv/bin/activate
     pip install -r requirements.txt
     ./venv/bin/streamlit run iptv_downloader.py --server.address="0.0.0.0" --server.port=8503 --server.headless true --server.enableCORS=false --server.baseUrlPath=/iptv &
-    echo $! > .iptv.pid
-
+    pid=$!
+    echo $pid > $pidfile
+    echo "Process started pid:$pid" 
 }
+if [ $# -eq 0 ];then
 
-if [ "$1" = "stop" ]
-then
-    killpid
-    exit
+    echo "rundlmgr [start|stop|status|makevenv|rebuild]"
+    exit 1
 fi
-{
-    if [ "$1" = "restart" ]
-    then
-        killpid
-    fi
-    if [ "$1" = "makevenv" ]
-    then
-        makevenv
-    fi
-    if [ "$1" = "rebuild" ]
-    then
-        rebuild
-    fi
 
-    start
+eval $1 
 
-}>>rundash.log 2>&1
+# if [ "$1" = "stop" ]
+# then
+#     killpid
+#     exit
+# fi
+# {
+#     if [ "$1" = "restart" ]
+#     then
+#         killpid
+#     fi
+#     if [ "$1" = "makevenv" ]
+#     then
+#         makevenv
+#     fi
+#     if [ "$1" = "rebuild" ]
+#     then
+#         rebuild
+#     fi
+# 
+#     start
+# 
+# }
+# >>rundash.log 2>&1
 
