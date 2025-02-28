@@ -122,18 +122,28 @@ with tab_dl:
             redacted_filtered_media=[]
             for item in filtered_media_df:
                 rec = {k:v for k,v in item.items() if k in ["url","media_type","group","original_title","logo"]}
+                # if the first 5 chars contain a - at the end such as ALB - or EN - strip this
+                title = rec['original_title'].strip()
+                if "-" == title[4] or "-" == title[3]:
+                    title = rec["original_title"].split("-",1)[1].strip()
+                    # remove any string starting with [ and ending with ]
+                    title = re.sub(r'\[.*?\]', '', title).strip()
+                else:
+                    title = rec["original_title"]
+                rec["imdb"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
                 redacted_filtered_media.append(rec)
             filtered_media_df = pd.DataFrame(redacted_filtered_media)
             filtered_media_df["Download"] = False
             # reorder filtered_media_df column so that Download is at the beginning
-            cols = ["Download","logo","original_title","group","media_type","url"]
+            cols = ["Download","logo","original_title","group","media_type","url","imdb"]
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
             download_items_df = st.data_editor(filtered_media_df,
                                                column_config={"Download": st.column_config.CheckboxColumn(default=False),
-                                                              "url":None,
-                                                              "logo":st.column_config.ImageColumn()},
+                                                              "url": None,
+                                                              "logo": st.column_config.ImageColumn(),
+                                                              "imdb": st.column_config.LinkColumn("IMDB",display_text="IMDB Search" )},
                                                key="search_results")
 
             selected_items = download_items_df[download_items_df["Download"] == True]
