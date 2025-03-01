@@ -143,7 +143,7 @@ with tab_dl:
                                                column_config={"Download": st.column_config.CheckboxColumn(default=False),
                                                               "url": None,
                                                               "logo": st.column_config.ImageColumn(),
-                                                              "imdb": st.column_config.LinkColumn("IMDB",display_text="IMDB Search" )},
+                                                              "imdb": st.column_config.LinkColumn("IMDB",display_text="IMDB Search",disabled=True )},
                                                key="search_results")
 
             selected_items = download_items_df[download_items_df["Download"] == True]
