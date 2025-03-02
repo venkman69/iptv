@@ -230,7 +230,7 @@ def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTb
             if st:
                 st.write(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
-            dc.set(key=m3u_url,value= m3u_playlist,expire=86400)
+            dc.set(key=m3u_url,value= m3u_playlist,expire=21600) # 6hours
             return m3u_playlist
     except Exception as e:
         print(e)
