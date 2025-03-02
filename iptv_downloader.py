@@ -46,10 +46,7 @@ tab_dl, tab_dl_mgr, tab_history, tab_m3u_mgr=st.tabs(tabs)
 
 if not "mediatypes" in st.session_state:
     st.session_state.mediatypes = ["All"]+[rec.media_type for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.media_type).distinct()]
-if not "groups" in st.session_state:
-    st.session_state.groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct()]
 
-groups = st.session_state.groups
 
 # with st.sidebar:
 with tab_dl:
@@ -77,7 +74,18 @@ with tab_dl:
             where_clauses.append(( iptvdb.IPTVTbl.media_type == selected_media_type) )
         if date_picker_toggle:
             where_clauses.append((iptvdb.IPTVTbl.added_date >= date_added_since))
-        groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(*where_clauses)]
+        if st.toggle("English Groups"):
+            english_groups=True
+            english_where_clause=iptvdb.IPTVTbl.group.contains("ENGLISH") | \
+                           iptvdb.IPTVTbl.group.contains(" EN ") | \
+                           iptvdb.IPTVTbl.group.in_([
+            "VOD | IMDB TOP 500","SRS | UK SERIES [EN] ","SRS | NETFLIX [EN]",
+            "SRS | ANIME [EN]","SRS | SERIES [EN]","SRS | CLASSIC SERIES [EN]"])
+            group_select_obj= iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(english_where_clause)
+            groups= [rec.group for rec in group_select_obj]
+        else:
+            english_groups=False
+            groups = [rec.group for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.group).distinct().where(*where_clauses)]
         selected_group = st.selectbox("Select Group", ["All"] + groups)
     
     search_title = st.text_input("Search Title").lower()
@@ -87,6 +95,10 @@ with tab_dl:
         where_clauses.append((iptvdb.IPTVTbl.provider_m3u_base == selected_provider ))
     if selected_group != "All":
         where_clauses.append((iptvdb.IPTVTbl.group == selected_group ) )
+    else:
+        if english_groups:
+            where_clauses.append(english_where_clause)
+        
     if selected_media_type != "All":
         where_clauses.append((iptvdb.IPTVTbl.media_type == selected_media_type ) )
     if date_picker_toggle:
@@ -94,19 +106,19 @@ with tab_dl:
 
     if search_title or selected_group != "All" or selected_media_type != "All" or selected_provider != "All" or date_added_since != (1==1):
         print(f"Provider: {selected_provider} selected_group: {selected_group}, search_title: {search_title}")
-        search_cache_key = sha256(f"{date_added_since}{selected_provider}{selected_group}{selected_media_type}{search_title}".encode()).hexdigest()
-        if st.session_state.get(search_cache_key):
-            filtered_media = st.session_state[search_cache_key]
-        else:
-            filtered_media = []
+        # search_cache_key = sha256(f"{date_added_since}{selected_provider}{selected_group}{selected_media_type}{search_title}".encode()).hexdigest()
+        # if st.session_state.get(search_cache_key):
+        #     filtered_media = st.session_state[search_cache_key]
+        # else:
+        #     filtered_media = []
             
-            search_words = search_title.split()
-            for word in search_words:
-                where_clauses.append((iptvdb.IPTVTbl.title.contains(word)))
-                
-            filtered_media = iptvdb.IPTVTbl.select().where(*where_clauses).order_by(iptvdb.IPTVTbl.title)
-        
-            st.session_state[search_cache_key] = filtered_media
+        search_words = search_title.split()
+        for word in search_words:
+            where_clauses.append((iptvdb.IPTVTbl.title.contains(word)))
+            
+        filtered_media = iptvdb.IPTVTbl.select().where(*where_clauses).order_by(iptvdb.IPTVTbl.title)
+    
+        # st.session_state[search_cache_key] = filtered_media
         if st.toggle("Debug SQL"):
             st.write(filtered_media)
         # display the records in filtered_media as a table
@@ -183,7 +195,7 @@ with tab_dl:
                             raise ValueError(f"IPTVTbl object not found for {item.url}")
                     st.write("Submitted dl queue")
 
-                    del st.session_state[search_cache_key]
+                    # del st.session_state[search_cache_key]
                     selected_items = download_items_df[download_items_df["Download"] == True]
                     print(download_items_df)
                     try:
