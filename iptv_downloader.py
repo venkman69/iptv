@@ -33,7 +33,8 @@ iptvdb.create_all()
 cfg = get_config()
 MOVIE_DOWNLOAD_PATH= cfg["general"]["movie_download_path"]
 SERIES_DOWNLOAD_PATH= cfg["general"]["series_download_path"]
-AI_TOKEN=cfg["ai"]["token"]
+if cfg.has_section("ai"):
+    AI_TOKEN=cfg["ai"]["token"]
 
 
 # show a pulldown menu with groups from media_list and for language and a search input text for title
