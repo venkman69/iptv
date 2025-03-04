@@ -33,6 +33,7 @@ iptvdb.create_all()
 cfg = get_config()
 MOVIE_DOWNLOAD_PATH= cfg["general"]["movie_download_path"]
 SERIES_DOWNLOAD_PATH= cfg["general"]["series_download_path"]
+AI_TOKEN=cfg["ai"]["token"]
 
 
 # show a pulldown menu with groups from media_list and for language and a search input text for title
@@ -40,6 +41,7 @@ st.set_page_config(page_title="IPTV Downloader", page_icon=":tv:", layout="wide"
 
 st.title("IPTV Downloader")
 
+auto_refresh_toggle=st.toggle("AutoRefresh")
 
 tabs = ["Media Downloader","Download Progress", "History", "M3u Manager"]
 tab_dl, tab_dl_mgr, tab_history, tab_m3u_mgr=st.tabs(tabs)
@@ -208,7 +210,6 @@ with tab_dl:
 
 with tab_dl_mgr:
     st.header("Download manager")
-    auto_refresh_toggle=st.toggle("AutoRefresh")
     
     def load_pending_items():
         pending_items = list(iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state.in_([iptvdb.DownloadStates.PENDING, iptvdb.DownloadStates.IN_PROGRESS])).dicts())
