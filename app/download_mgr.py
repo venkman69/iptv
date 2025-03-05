@@ -16,10 +16,6 @@ log_dir = cfg["general"]["log_dir"]
 logger = utils.config_logger("download_mgr.log",Path(log_dir))
 logger.setLevel(logging.DEBUG)
 logging.getLogger("peewee").disabled=True
-# logger = logging.getLogger(__name__)
-
-# configure log output to contain datetime, method and line number
-# formatter = logging.Formatter(
 #             "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
 #                         datefmt="%Y-%m-%d %H:%M:%S")
 # file_handler = logging.FileHandler('download_mgr.log')

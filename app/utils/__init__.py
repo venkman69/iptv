@@ -263,7 +263,6 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
     Raises:
         e: _description_
     """
-    global logger
     write_lock = threading.Lock()
     fetch_time = datetime.now()
     start=currenttimemillis()
