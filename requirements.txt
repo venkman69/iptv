@@ -10,3 +10,4 @@ m3u-ipytv
 langcodes
 language_data
 diskcache
+google-genai

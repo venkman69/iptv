@@ -1,6 +1,6 @@
 #!/bin/bash
 cd /home/venkman/git/iptv
-pidfile='.iptv.pid'
+pidfile='./work/.iptv.pid'
 function stop {
     if [ -f $pidfile ]
     then
@@ -52,7 +52,7 @@ function start {
     git pull
     . ./venv/bin/activate
     pip install -r requirements.txt
-    ./venv/bin/streamlit run iptv_downloader.py --server.address="0.0.0.0" --server.port=8503 --server.headless true --server.enableCORS=false --server.baseUrlPath=/iptv &
+    ./venv/bin/streamlit run app/iptv_downloader.py --server.address="0.0.0.0" --server.port=8503 --server.headless true --server.enableCORS=false --server.baseUrlPath=/iptv &
     pid=$!
     echo $pid > $pidfile
     echo "Process started pid:$pid" 
@@ -64,28 +64,3 @@ if [ $# -eq 0 ];then
 fi
 
 eval $1 
-
-# if [ "$1" = "stop" ]
-# then
-#     killpid
-#     exit
-# fi
-# {
-#     if [ "$1" = "restart" ]
-#     then
-#         killpid
-#     fi
-#     if [ "$1" = "makevenv" ]
-#     then
-#         makevenv
-#     fi
-#     if [ "$1" = "rebuild" ]
-#     then
-#         rebuild
-#     fi
-# 
-#     start
-# 
-# }
-# >>rundash.log 2>&1
-

@@ -3,22 +3,28 @@
 # and in each step it updates the current state of the record
 from datetime import datetime
 import time
-import iptvdb
-import util
+import db.iptvdb as iptvdb
+import utils as utils
 from peewee import SqliteDatabase
 import logging
+from pathlib import Path
 currenttimemillis=lambda: int(round(time.time() * 1000))
 
-logger = logging.getLogger(__name__)
+cfg=utils.get_config()
+
+log_dir = cfg["general"]["log_dir"]
+logger = utils.config_logger("download_mgr.log",Path(log_dir))
 logger.setLevel(logging.DEBUG)
+logging.getLogger("peewee").disabled=True
+# logger = logging.getLogger(__name__)
 
 # configure log output to contain datetime, method and line number
-formatter = logging.Formatter(
-            "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
-                        datefmt="%Y-%m-%d %H:%M:%S")
-file_handler = logging.FileHandler('download_mgr.log')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+# formatter = logging.Formatter(
+#             "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
+#                         datefmt="%Y-%m-%d %H:%M:%S")
+# file_handler = logging.FileHandler('download_mgr.log')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 def process_download_queue():
     pending_downloads = iptvdb.DownloadQueueTbl.select().where(iptvdb.DownloadQueueTbl.state == 'pending').order_by(iptvdb.DownloadQueueTbl.created_date)
@@ -34,7 +40,7 @@ def process_download_queue():
             logger.info(f"Processing download for {download.file_path} URL: {authenticated_url}")
             eta = 0
             start = currenttimemillis()
-            for prog in util.download_large_file(download.file_path, authenticated_url):
+            for prog in utils.download_large_file(download.file_path, authenticated_url):
                 middle = currenttimemillis()
                 speed = prog * 1000 / (middle - start) # % points per second
                 remainder = 1- prog
@@ -61,7 +67,6 @@ def process_download_queue():
             logger.error(f"Download failed for URL: {download.url.url}, Error: {str(e)}")
 
 if __name__ == "__main__":
-    from pathlib import Path
     WORK_DIR="./work"
     DATABASE = Path(WORK_DIR)/"iptv.db"
     sqldb = SqliteDatabase(DATABASE)

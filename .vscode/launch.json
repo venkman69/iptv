@@ -21,7 +21,7 @@
             "module": "streamlit",
             "args": [
                 "run",
-                "iptv_downloader.py",
+                "app/iptv_downloader.py",
                 "--server.headless",
                 "true",
             ],

@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import multiprocessing
 import multiprocessing.queues
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -16,7 +17,7 @@ from pymediainfo import MediaInfo
 import requests
 from streamlit import audio
 import streamlit
-import iptvdb
+import db.iptvdb as iptvdb
 from peewee import SqliteDatabase
 import logging
 import time
@@ -25,22 +26,34 @@ from diskcache import Cache
 currenttimemillis=lambda: int(round(time.time() * 1000))
 dc = Cache("work/m3ucache")
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-# logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
-# configure log output to contain datetime, method and line number
-formatter = logging.Formatter(
-            "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
-                        datefmt="%Y-%m-%d %H:%M:%S")
-file_handler = logging.FileHandler('iptv_downloader.log')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+# logger = logging.getLogger(__name__)
+# logger.setLevel(logging.DEBUG)
+# # logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
+# # configure log output to contain datetime, method and line number
+# formatter = logging.Formatter(
+#             "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
+#                         datefmt="%Y-%m-%d %H:%M:%S")
+# file_handler = logging.FileHandler('iptv_downloader.log')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 ipytv_logger = logging.getLogger("ipytv.channel")
 ipytv_logger.disabled = True
 ipytv_logger = logging.getLogger("ipytv.playlist")
 ipytv_logger.disabled = True
 
+def config_logger(log_file_name:str, log_file_dir:Path):
+    log_file_dir.mkdir(parents=True,exist_ok=True)
+    log_file_path = log_file_dir / log_file_name
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format= "%(asctime)s %(levelname)s %(name)s:%(funcName)s():%(lineno)i %(message)s",
+        handlers=[
+            logging.FileHandler(log_file_path)
+        ]
+    )
+    return logging.getLogger(__name__)
+    
 
 
 class MyMediaInfo(object):
@@ -433,9 +446,12 @@ def download_regular_file_mock(target_file_name:str, url:str):
     print("mock file used")
 
 def get_config():
-    cfg = ConfigParser()
-    cfg.read("iptv_downloader.ini")
-    return cfg
+    if Path("config/iptv_downloader.ini").exists():
+        cfg = ConfigParser()
+        cfg.read("config/iptv_downloader.ini")
+        return cfg
+    else:
+        raise FileNotFoundError(f"config/iptv_downloader.ini file not found at: {os.getcwd()}")
 
 if __name__ == '__main__':
     WORK_DIR="./work"
