@@ -42,12 +42,12 @@ function rebuild {
     stop
     git pull
     rm -rf venv
+    makevenv
     start
 }
 
 function start {
 
-    makevenv
     status
     git pull
     . ./venv/bin/activate
