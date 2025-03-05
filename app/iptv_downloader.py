@@ -14,15 +14,16 @@ import pandas as pd
 import os
 import requests
 import shutil
-from utils import *
+import utils
 from streamlit_option_menu import option_menu   # pip install streamlit-option-menu
 from streamlit_autorefresh import st_autorefresh
 import db.iptvdb as iptvdb
 from peewee import SqliteDatabase
 from playhouse.shortcuts import model_to_dict
 from datetime import datetime
+import logging
 
-cfg = get_config()
+cfg = utils.get_config()
 WORK_DIR=cfg["general"]["work_dir"]
 if not os.path.exists(WORK_DIR):
     os.makedirs(WORK_DIR)
@@ -31,6 +32,11 @@ DATABASE = Path(WORK_DIR)/"iptv.db"
 sqldb = SqliteDatabase(DATABASE)
 iptvdb.db_proxy.initialize(sqldb)
 iptvdb.create_all()
+log_dir = cfg["general"]["log_dir"]
+logger = utils.config_logger("iptv_downloader.log",Path(log_dir))
+logger.setLevel(logging.DEBUG)
+logging.getLogger("peewee").disabled=True
+
 
 MOVIE_DOWNLOAD_PATH= cfg["general"]["movie_download_path"]
 SERIES_DOWNLOAD_PATH= cfg["general"]["series_download_path"]
