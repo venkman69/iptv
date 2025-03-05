@@ -26,7 +26,7 @@ from diskcache import Cache
 currenttimemillis=lambda: int(round(time.time() * 1000))
 dc = Cache("work/m3ucache")
 
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 # logger.setLevel(logging.DEBUG)
 # # logging.basicConfig(filename="iptv_downloader.log",level = logging.INFO)
 # # configure log output to contain datetime, method and line number
@@ -222,7 +222,6 @@ def construct_m3u_url(site:str, username:str, password:str):
 
 def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
     """Reads an extended M3U file and returns a list of media entries."""
-    global logger
     media_list = []
     m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
     if m3u_playlist:
