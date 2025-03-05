@@ -260,7 +260,7 @@ with tab_m3u_mgr:
     if st.button("Refresh"):
         # provider_info:iptvdb.IPTVProviderTbl= iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider == selected_provider)
         with st.spinner():
-            update_iptvdb_tbl(selected_provider,None, None,None, st)
+            utils.update_iptvdb_tbl(selected_provider,None, None,None, st)
     
     st.divider()
     if "delproviders" not in st.session_state:

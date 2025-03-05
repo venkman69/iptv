@@ -222,6 +222,7 @@ def construct_m3u_url(site:str, username:str, password:str):
 
 def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
     """Reads an extended M3U file and returns a list of media entries."""
+    global logger
     media_list = []
     m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
     if m3u_playlist:
@@ -263,7 +264,7 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
     Raises:
         e: _description_
     """
-
+    global logger
     write_lock = threading.Lock()
     fetch_time = datetime.now()
     start=currenttimemillis()
