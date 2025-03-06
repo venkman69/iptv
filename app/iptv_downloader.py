@@ -15,6 +15,7 @@ import os
 import requests
 import shutil
 import utils
+from utils import MyMediaInfo
 from streamlit_option_menu import option_menu   # pip install streamlit-option-menu
 from streamlit_autorefresh import st_autorefresh
 import db.iptvdb as iptvdb
@@ -186,7 +187,7 @@ with tab_dl:
                     if item.url in selected_items_details:
                         media_info:MyMediaInfo = selected_items_details[item.url]
                     else:
-                        media_info:MyMediaInfo = get_media_info(item.url)
+                        media_info:MyMediaInfo = utils.get_media_info(item.url)
                         selected_items_details[item.url] = media_info
                     rec={"title":item.original_title}
                     rec.update(media_info.to_dict())
@@ -295,4 +296,4 @@ with tab_m3u_mgr:
     provider_username = st.text_input("Username")
     provider_password = st.text_input("Password")
     if st.button("Import Provider Playlist"):
-        update_iptvdb_tbl(provider_base_url,provider_site, provider_username,provider_password, st)
+        utils.update_iptvdb_tbl(provider_base_url,provider_site, provider_username,provider_password, st)
