@@ -158,12 +158,13 @@ with tab_dl:
                     logger.error(f"title[4] is throwing exception {title}")
                     title = rec["original_title"].strip()
 
+                rec["title"] = title
                 rec["original_title"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
                 redacted_filtered_media.append(rec)
             filtered_media_df = pd.DataFrame(redacted_filtered_media)
             filtered_media_df["Download"] = False
             # reorder filtered_media_df column so that Download is at the beginning
-            cols = ["Download","logo","original_title","group","media_type","url"]
+            cols = ["Download","logo","original_title","group","media_type","url","title"]
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
@@ -171,11 +172,12 @@ with tab_dl:
                                                column_config={"Download": st.column_config.CheckboxColumn(default=False),
                                                               "url": None,
                                                               "logo": st.column_config.ImageColumn(),
-                                                              "original_title":st.column_config.LinkColumn(
+                                                              "original_title":st.column_config.LinkColumn(disabled=True,
                                                                                                           display_text=".*=(.*)&.*" 
                                                                                                            ),
                                                               "group":st.column_config.Column(disabled=True),
-                                                              "media_type":st.column_config.Column(disabled=True)
+                                                              "media_type":st.column_config.Column(disabled=True),
+                                                              "title":None
                                                },
                                                key="search_results")
 
@@ -195,7 +197,7 @@ with tab_dl:
                     else:
                         media_info:MyMediaInfo = utils.get_media_info(item.url)
                         selected_items_details[item.url] = media_info
-                    rec={"title":item.original_title}
+                    rec={"title":item.title}
                     rec.update(media_info.to_dict())
                     details.append(rec)
                 st.session_state["selected_item_details"]=selected_items_details
