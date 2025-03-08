@@ -44,7 +44,11 @@ def process_download_queue():
                 download.progress = f"{prog * 100:.2f}"
                 download.file_size=Path(download.file_path).stat().st_size
                 download.updated_date = datetime.now()
-                download.save()
+                try:
+                    download.save()
+                    logger.info(f"Progress: {download.file_path} : {prog}")
+                except:
+                    pass
 
             finish=currenttimemillis() 
             # Update the state to 'complete'
@@ -53,14 +57,14 @@ def process_download_queue():
             download.eta = (finish - start ) / 1000
             download.save()
             
-            logger.info(f"Download complete for URL: {download.url.url}")
+            logger.info(f"Download complete for URL: {download.url.url} {download.file_path}")
         except Exception as e:
             # Update the state to 'failed' and set the failure message
             download.state = iptvdb.DownloadStates.FAILED
             download.failure_message = str(e)
             download.save()
             
-            logger.error(f"Download failed for URL: {download.url.url}, Error: {str(e)}")
+            logger.error(f"Download failed for URL: {download.url.url} {download.file_path}, Error: {str(e)}")
 
 if __name__ == "__main__":
     WORK_DIR="./work"
