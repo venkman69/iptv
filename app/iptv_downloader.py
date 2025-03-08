@@ -158,12 +158,12 @@ with tab_dl:
                     logger.error(f"title[4] is throwing exception {title}")
                     title = rec["original_title"].strip()
 
-                rec["imdb"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
+                rec["original_title"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
                 redacted_filtered_media.append(rec)
             filtered_media_df = pd.DataFrame(redacted_filtered_media)
             filtered_media_df["Download"] = False
             # reorder filtered_media_df column so that Download is at the beginning
-            cols = ["Download","logo","original_title","group","media_type","url","imdb"]
+            cols = ["Download","logo","original_title","group","media_type","url"]
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
@@ -171,8 +171,9 @@ with tab_dl:
                                                column_config={"Download": st.column_config.CheckboxColumn(default=False),
                                                               "url": None,
                                                               "logo": st.column_config.ImageColumn(),
-                                                              "imdb": st.column_config.LinkColumn("IMDB",display_text="IMDB Search",disabled=True ),
-                                                              "original_title":st.column_config.Column(disabled=True),
+                                                              "original_title":st.column_config.LinkColumn(
+                                                                                                          display_text=".*=(.*)&.*" 
+                                                                                                           ),
                                                               "group":st.column_config.Column(disabled=True),
                                                               "media_type":st.column_config.Column(disabled=True)
                                                },
