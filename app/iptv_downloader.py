@@ -147,12 +147,17 @@ with tab_dl:
                 rec = {k:v for k,v in item.items() if k in ["url","media_type","group","original_title","logo"]}
                 # if the first 5 chars contain a - at the end such as ALB - or EN - strip this
                 title = rec['original_title'].strip()
-                if "-" == title[4] or "-" == title[3]:
-                    title = rec["original_title"].split("-",1)[1].strip()
-                    # remove any string starting with [ and ending with ]
-                    title = re.sub(r'\[.*?\]', '', title).strip()
-                else:
-                    title = rec["original_title"]
+                try:
+                    if "-" == title[4] or "-" == title[3]:
+                        title = rec["original_title"].split("-",1)[1].strip()
+                        # remove any string starting with [ and ending with ]
+                        title = re.sub(r'\[.*?\]', '', title).strip()
+                    else:
+                        title = rec["original_title"].strip()
+                except Exception as e:
+                    logger.error(f"title[4] is throwing exception {title}")
+                    title = rec["original_title"].strip()
+
                 rec["imdb"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
                 redacted_filtered_media.append(rec)
             filtered_media_df = pd.DataFrame(redacted_filtered_media)

@@ -69,7 +69,7 @@ class MyMediaInfo(object):
                 format = track.get("format")
                 duration = track.get("duration", "0")
                 # convert duration seconds to hours and minutes
-                duration = int(duration) / 1000  # convert to seconds
+                duration = int(float(duration)) / 1000  # convert to seconds
                 hours = int(duration // 3600)
                 minutes = int((duration % 3600) // 60)
                 hour_minute = f"{hours:02}:{minutes:02}"
