@@ -198,7 +198,7 @@ with tab_dl:
                     else:
                         media_info:MyMediaInfo = utils.get_media_info(item.url)
                         selected_items_details[item.url] = media_info
-                    rec={"title":item.title+"/"+iptv_obj.get_target_filename()}
+                    rec={"title":item.title+" | "+str(iptv_obj.get_target_filename(cfg))}
                     rec.update(media_info.to_dict())
                     details.append(rec)
                 st.session_state["selected_item_details"]=selected_items_details
