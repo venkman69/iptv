@@ -212,7 +212,7 @@ with tab_dl:
                             download_mgr_obj = iptvdb.DownloadQueueTbl.create(created_date = created_date,
                                                                             updated_date = created_date,
                                                                             url = iptv_obj.url,
-                                                                                file_path = iptv_obj.get_target_filename(MOVIE_DOWNLOAD_PATH,SERIES_DOWNLOAD_PATH),
+                                                                                file_path = iptv_obj.get_target_filename(cfg),
                                                                                 state = iptvdb.DownloadStates.PENDING )
                         else:
                             raise ValueError(f"IPTVTbl object not found for {item.url}")
@@ -220,7 +220,7 @@ with tab_dl:
 
                     # del st.session_state[search_cache_key]
                     selected_items = download_items_df[download_items_df["Download"] == True]
-                    print(download_items_df)
+                    # print(download_items_df)
                     try:
                         for row in selected_items.itertuples():
                             row["Download"] = False

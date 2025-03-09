@@ -1,3 +1,4 @@
+from configparser import ConfigParser
 import json
 from urllib.parse import urlparse
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
@@ -8,6 +9,7 @@ from ipytv.channel import IPTVChannel
 from langcodes import *
 import logging
 from pathlib import Path
+from mnamer import target, setting_store, providers
 
 
 logger = logging.getLogger(__name__)
@@ -87,14 +89,26 @@ class IPTVTbl(BaseModel):
             self.media_type = "livetv"
         self.logo = channel_object.attributes.get("tvg-logo",None)
     
-    def get_target_filename(self,movie_path:str, series_path:str):
-
+    def get_target_filename(self,cfg:ConfigParser):
+        movie_path = cfg["general"]["movie_download_path"]
+        series_path = cfg["general"]["series_download_path"]
         file_extn = self.url.split('.')[-1]
         if self.media_type == "movie":
             target_file_name = Path(movie_path) / f"{self.title}.{file_extn}"
         if self.media_type == "series":
-            target_file_name = Path(series_path) / f"{self.title}.{file_extn}"
+            mnamer_settings =  setting_store.SettingStore()
+            mnamer_object=target.Target(Path(f"{self.title}.{file_extn}"),mnamer_settings)
+            hits =mnamer_object.query()
+            # use the first hit
+            for hit in hits:
+                if hit.series == mnamer_object.metadata.series:
+                    mnamer_object.metadata.title = hit.title
+                    break
+            series_name_dir = Path(series_path) / mnamer_object.metadata.series
+            season_path = series_name_dir / f"Season {mnamer_object.metadata.season}"
+            target_file_name = season_path / mnamer_object.destination
         return target_file_name
+    
     
     def get_authenticated_url_old(self):
         provider_obj = IPTVProviderTbl.get_or_none(IPTVProviderTbl.provider_m3u_base==self.provider_m3u_base)

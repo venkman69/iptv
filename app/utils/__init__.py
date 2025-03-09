@@ -1,13 +1,16 @@
 from configparser import ConfigParser
 from datetime import datetime
+from importlib import metadata
 import json
 import multiprocessing
 import multiprocessing.queues
 import os
+import sys
 from pathlib import Path
 import shutil
 import tempfile
 import threading
+from typing import Tuple
 import ipytv
 import ipytv.exceptions
 from ipytv.playlist import M3UPlaylist
@@ -17,11 +20,13 @@ from pymediainfo import MediaInfo
 import requests
 from streamlit import audio
 import streamlit
-import db.iptvdb as iptvdb
+#from ..db import iptvdb 
 from peewee import SqliteDatabase
 import logging
 import time
 from diskcache import Cache
+sys.path.append("/home/venkman/git/iptv/app")
+import db.iptvdb as iptvdb
 
 currenttimemillis=lambda: int(round(time.time() * 1000))
 dc = Cache("work/m3ucache")
@@ -198,9 +203,9 @@ def get_media_info(url)->MyMediaInfo:
         return MyMediaInfo(vid_stream_data.get_media_info_json())
 
 # declare media_type as an enum with MOVIE and TV_SERIES as members
-class media_type:
+class MediaType:
     MOVIE = "movie"
-    TV_SERIES = "tv_series"
+    TV_SERIES = "series"
     LIVETV="liveTV"
 
 def construct_m3u_url(site:str, username:str, password:str):
@@ -416,6 +421,9 @@ def download_large_file(target_file_name:str, url:str):
     """ THis is a generator object to show progress
     cannot be used by itself without being in an iterator loop
     """
+    target_path = Path(target_file_name)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    
     with requests.get(url, stream=True,headers={'User-Agent':"Chrome"}) as r:
         chunk_size = 1024 * 1024
         r.raise_for_status()
@@ -431,7 +439,7 @@ def download_large_file(target_file_name:str, url:str):
                 if prog > 1: prog = 1
                 yield prog
                 f.write(chunk)
-    
+
 def download_regular_file(target_file_name:str, url:str):
     resp = requests.get(url, headers={'User-Agent':"Chrome"},timeout=120)
     resp.raise_for_status()
@@ -451,6 +459,9 @@ def get_config():
         return cfg
     else:
         raise FileNotFoundError(f"config/iptv_downloader.ini file not found at: {os.getcwd()}")
+
+
+
 
 if __name__ == '__main__':
     WORK_DIR="./work"
