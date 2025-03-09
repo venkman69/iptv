@@ -294,7 +294,7 @@ with tab_m3u_mgr:
         if st.button("Delete"):
             st.write("Deleting")
             provider_obj=iptvdb.IPTVProviderTbl.get_or_none(iptvdb.IPTVProviderTbl.provider_site==provider)
-            provider_obj.delete_instance()
+            provider_obj.delete_instance(recursive=True)
             del st.session_state['delproviders']
             st.write("Deleted provider")
             st.rerun()
