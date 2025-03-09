@@ -192,12 +192,13 @@ with tab_dl:
                     selected_items_details = {}
                 details=[]
                 for item in selected_items.itertuples():
+                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.url)
                     if item.url in selected_items_details:
                         media_info:MyMediaInfo = selected_items_details[item.url]
                     else:
                         media_info:MyMediaInfo = utils.get_media_info(item.url)
                         selected_items_details[item.url] = media_info
-                    rec={"title":item.title}
+                    rec={"title":item.title+"/"+iptv_obj.get_target_filename()}
                     rec.update(media_info.to_dict())
                     details.append(rec)
                 st.session_state["selected_item_details"]=selected_items_details
