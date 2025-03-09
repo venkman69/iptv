@@ -98,12 +98,15 @@ class IPTVTbl(BaseModel):
         if self.media_type == "series":
             mnamer_settings =  setting_store.SettingStore()
             mnamer_object=target.Target(Path(f"{self.title}.{file_extn}"),mnamer_settings)
-            hits =mnamer_object.query()
-            # use the first hit
-            for hit in hits:
-                if hit.series == mnamer_object.metadata.series:
-                    mnamer_object.metadata.title = hit.title
-                    break
+            try:
+                hits =mnamer_object.query()
+                # use the first hit
+                for hit in hits:
+                    if hit.series == mnamer_object.metadata.series:
+                        mnamer_object.metadata.title = hit.title
+                        break
+            except:
+                logger.error(f"mnamer could not find tv series {self.title}")
             series_name_dir = Path(series_path) / mnamer_object.metadata.series
             season_path = series_name_dir / f"Season {mnamer_object.metadata.season}"
             target_file_name = season_path / mnamer_object.destination
