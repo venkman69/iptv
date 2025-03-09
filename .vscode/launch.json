@@ -4,6 +4,14 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        {"name":"compare media",
+        "type":"debugpy","request":"launch",
+        "program":"app/compare_media.py",
+        "args": ["/mnt/movies/Episodic/Staging/EN - The Mandalorian S02 E03.mkv",
+         "/mnt/movies/Episodic/The Mandalorian/Season 2/The.Mandalorian.S02E03.720p.DDP5-MZABI.mkv",
+        ]
+
+    },
 
         {
             "name": "Python Debugger: Current File",

@@ -12,3 +12,4 @@ language_data
 diskcache
 google-genai
 mnamer
+prettytable
