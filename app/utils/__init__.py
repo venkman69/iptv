@@ -2,6 +2,7 @@ from configparser import ConfigParser
 from datetime import datetime
 from importlib import metadata
 import json
+import math
 import multiprocessing
 import multiprocessing.queues
 import os
@@ -15,6 +16,7 @@ import ipytv
 import ipytv.exceptions
 from ipytv.playlist import M3UPlaylist
 from ipytv.channel import IPTVChannel
+import ipytv.playlist
 from langcodes import Language
 from pymediainfo import MediaInfo
 import requests
@@ -27,6 +29,7 @@ import time
 from diskcache import Cache
 sys.path.append("/home/venkman/git/iptv/app")
 import db.iptvdb as iptvdb
+import shutil
 
 currenttimemillis=lambda: int(round(time.time() * 1000))
 dc = Cache("work/m3ucache")
@@ -157,8 +160,11 @@ class MyMediaInfo(object):
     def __get_subtitles(self):
         recs = []
         for track in self.subtitles:
-            lang = Language.get(track['language']).display_name()
-            recs.append(lang)
+            try:
+                lang = Language.get(track['language']).display_name()
+                recs.append(lang)
+            except:
+                recs.append(track['language'])
         return " | ".join(recs)
 
     def to_dict(self):
@@ -224,9 +230,33 @@ def construct_m3u_url(site:str, username:str, password:str):
             #  f"{site}/get.php?username={username}&password={password}&type=m3u&output=mpegts"
                 #  ]
     return url_option
+def compare_vods(old_vod, new_vod):
+    old_vod_map,old_header =read_vod_to_map(old_vod)
+    new_vod_map,new_header =read_vod_to_map(new_vod)
+    old_urls = set(old_vod_map.keys())
+    new_urls = set(new_vod_map.keys())
+    delta_new = new_urls - old_urls
+    final_map={}
+    for url in delta_new:
+        final_map[url]=new_vod_map[url]
+    new_lines=[old_header]
+    for k,v in final_map.items():
+        new_lines.append(v)
+        new_lines.append(k)
+    return new_lines
+
+def read_vod_to_map(vod:str):
+    vod_lines = vod.split("\n")
+    vod_url_map ={}
+    for i in range(2,len(vod_lines),2):
+        url = vod_lines[i]
+        ext = vod_lines[i-1]
+        vod_url_map[url] = ext
+    return vod_url_map, vod_lines[0]
 
 def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
     """Reads an extended M3U file and returns a list of media entries."""
+    global WORK_DIR
     media_list = []
     m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
     if m3u_playlist:
@@ -240,10 +270,11 @@ def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTb
             if st:
                 st.write(f"Beginning download of m3u")
             download_regular_file(tmpfile.name, m3u_url)
+            shutil.copy(tmpfile.name, "./work/")
             logger.debug(f"Completed download of m3u, Parsing m3u file")
             if st:
                 st.write(f"Completed download of m3u, Parsing m3u file")
-            m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
+                m3u_playlist:M3UPlaylist = ipytv.playlist.loadf(tmpfile.name)
             logger.debug(f"Completed parsing m3u file")
             if st:
                 st.write(f"Completed parsing m3u file")
@@ -337,6 +368,8 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         logger.debug(f"Executed bulk create IPTVTbl records:{finish-start}ms")
         if st:
             st.write(f"Executed bulk create IPTVTbl records:{finish-start}ms")
+        provider_object.last_updated=datetime.now()
+        provider_object.save()
         
     else:
         records=[]
@@ -370,6 +403,8 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         logger.debug(f"Completed update of IPTVTbl in {finish-start}ms")
         if st:
             st.write(f"Completed update of IPTVTbl in {finish-start}ms")
+        provider_object.last_updated=datetime.now()
+        provider_object.save()
 
 def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:iptvdb.IPTVProviderTbl):
     mp = multiprocessing.Pool()
@@ -433,11 +468,16 @@ def download_large_file(target_file_name:str, url:str):
         with open(target_file_name, 'wb') as f:
             chunks = int(int(file_size) // chunk_size)
             chunk_count = 0
+            last_prog=0
+            one_percent_chunks=math.ceil(chunks/100)
             for chunk in r.iter_content(chunk_size=chunk_size):
                 chunk_count+=1
-                prog= chunk_count/chunks
-                if prog > 1: prog = 1
-                yield prog
+                prog= int(chunk_count/one_percent_chunks)
+                if prog != last_prog:
+                    last_prog = prog
+                    if prog > 100: 
+                        prog = 100
+                    yield prog/100
                 f.write(chunk)
 
 def download_regular_file(target_file_name:str, url:str):

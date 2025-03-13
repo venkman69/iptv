@@ -32,7 +32,7 @@ if __name__=="__main__":
     
     tbl = PrettyTable()
     tbl.field_names=["Item","FileA","FileB"]
-    tbl._max_width={"Item":8,"FileA":40,"FileB":40}
+    tbl._max_width={"Item":8,"FileA":50,"FileB":50}
     for key,value in file_a.items():
         tbl.add_row([key,value,file_b[key]])
     print(tbl)
