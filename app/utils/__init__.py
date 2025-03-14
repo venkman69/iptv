@@ -231,45 +231,58 @@ def construct_m3u_url(site:str, username:str, password:str):
                 #  ]
     return url_option
 def compare_vods(old_vod, new_vod):
-    old_vod_map,old_header =read_vod_to_map(old_vod)
-    new_vod_map,new_header =read_vod_to_map(new_vod)
+    old_vod_map =read_vod_to_map(old_vod)
+    new_vod_map =read_vod_to_map(new_vod)
     old_urls = set(old_vod_map.keys())
     new_urls = set(new_vod_map.keys())
     delta_new = new_urls - old_urls
     final_map={}
     for url in delta_new:
         final_map[url]=new_vod_map[url]
-    new_lines=[old_header]
+    new_lines=["#EXTM3U"]
     for k,v in final_map.items():
         new_lines.append(v)
         new_lines.append(k)
     return new_lines
 
-def read_vod_to_map(vod:str):
+def read_vod_to_map(vod_file:str)->dict:
+    """Read the vod file to a map of url->extinfo 
+    returns map,header
+    skips live tv and keeps only series and movies
+    """
+    with open(vod_file) as f:
+        vod=f.read()
     vod_lines = vod.split("\n")
     vod_url_map ={}
     for i in range(2,len(vod_lines),2):
         url = vod_lines[i]
         ext = vod_lines[i-1]
+        if not ( "series" in url or "movie" in url):
+            continue
         vod_url_map[url] = ext
-    return vod_url_map, vod_lines[0]
+    return vod_url_map
 
-def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTbl]: 
-    """Reads an extended M3U file and returns a list of media entries."""
+def read_m3u(m3u_url:str, st:streamlit=None)->dict: 
+    """Reads an extended M3U file and retuns a url->extinfo map"""
     global WORK_DIR
     media_list = []
-    m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
-    if m3u_playlist:
-        logger.info("Returning cached m3u_playlist")
-        if st:
-            st.write("Returning cached m3u_playlist")
-        return m3u_playlist
+    # m3u_playlist, expire_time = dc.get(m3u_url,None, expire_time=True)
+    # if m3u_playlist:
+    #     logger.info("Returning cached m3u_playlist")
+    #     if st:
+    #         st.write("Returning cached m3u_playlist")
+    #     return m3u_playlist
     try:
         with tempfile.NamedTemporaryFile(prefix="vod") as tmpfile:
             logger.debug(f"Beginning download of m3u")
             if st:
                 st.write(f"Beginning download of m3u")
             download_regular_file(tmpfile.name, m3u_url)
+            logger.debug(f"Completed download of m3u, reading into a map")
+            if st:
+                st.write(f"Completed download of m3u, reading into a map ")
+            vodmap = read_vod_to_map(tmpfile.name)
+            return vodmap
             shutil.copy(tmpfile.name, "./work/")
             logger.debug(f"Completed download of m3u, Parsing m3u file")
             if st:
@@ -279,7 +292,6 @@ def read_m3u(m3u_url:str, st:streamlit=None)->M3UPlaylist: #->List[iptvdb.IPTVTb
             if st:
                 st.write(f"Completed parsing m3u file")
             # m3u_json = json.loads(m3u_playlist.to_json_playlist())
-            dc.set(key=m3u_url,value= m3u_playlist,expire=21600) # 6hours
             return m3u_playlist
     except Exception as e:
         print(e)
@@ -325,17 +337,18 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
 
     try:
         start=currenttimemillis()
-        media_list:M3UPlaylist = read_m3u(m3u_url, st)
+        ext_map = read_m3u(m3u_url, st)
+        # media_list:M3UPlaylist = read_m3u(m3u_url, st)
         finish=currenttimemillis()
         logger.debug(f"M3u fetch took {finish - start}ms")
         st.write(f"M3u fetch took {finish - start}ms")
-        start=currenttimemillis()
-        for chan in media_list:
-            chan.attributes["provider"] = provider_m3u_base
-            chan.attributes["fetch_time"] = fetch_time
-        finish=currenttimemillis()
-        logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
-        st.write(f"Adding provider to all M3U Channels took {finish - start}ms")
+        # start=currenttimemillis()
+        # for chan in media_list:
+        #     chan.attributes["provider"] = provider_m3u_base
+        #     chan.attributes["fetch_time"] = fetch_time
+        # finish=currenttimemillis()
+        # logger.debug(f"Adding provider to all M3U Channels took {finish - start}ms")
+        # st.write(f"Adding provider to all M3U Channels took {finish - start}ms")
     except ipytv.exceptions.URLException as e:
         print(e)
         st.write(e)
@@ -356,7 +369,9 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         counter=0
 
         # start=currenttimemillis()
-        records = create_iptvdbtbl_objects_threaded(media_list, provider_object)
+        records = create_iptvdbtbl_objects_threaded(ext_map, provider_object, provider_m3u_base, fetch_time)
+        #     chan.attributes["provider"] = provider_m3u_base
+        #     chan.attributes["fetch_time"] = fetch_time
         finish=currenttimemillis()
         logger.debug(f"Finished writing in {(finish-start)}")
         st.write(f"Finished writing in {(finish-start)}")
@@ -377,28 +392,36 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         if st:
             st.write(f"IPTVTbl records exist, updating missing items")
         existing_urls = [rec.url for rec in iptvdb.IPTVTbl.select(iptvdb.IPTVTbl.url).where(iptvdb.IPTVTbl.provider_m3u_base==provider_m3u_base) ]
-        item_dict = {}
-        for item in media_list:
-            if not ( "series" in item.url or "movie" in item.url):
-                continue
-            item_dict[provider_object.tokenize_channel_url(item.url)]=item
-        to_be_created=set(item_dict.keys()) - set(existing_urls)
-        to_be_deleted=set(existing_urls) - set(item_dict.keys())
-        start=currenttimemillis()
-        for key in to_be_created:
-            item = item_dict[key]
+        # tokenize the ext map urls
+        # this has to be done here so url to url can be compared
+        new_ext_map = {}
+        for url in ext_map.keys():
+            new_url=provider_object.tokenize_channel_url(url)
+            new_ext_map[new_url]=ext_map[url]
+
+        m3u_urls = set(new_ext_map.keys())
+        to_be_created = m3u_urls - set(existing_urls)
+        to_be_deleted = set(existing_urls) - m3u_urls
+        to_be_created_ext=["#EXTM3U"]
+        for url in to_be_created:
+            to_be_created_ext.append(new_ext_map[url])
+            to_be_created_ext.append(url)
+        to_be_created_m3u = ipytv.playlist.loadl(to_be_created_ext)
+        records=[]
+        for item in to_be_created_m3u:
             iptvobj=iptvdb.IPTVTbl()
-            iptvobj.get_from_m3u_channel_object(item,provider_object)
+            iptvobj.get_from_m3u_channel_object(item,provider_object, fetch_time)
             records.append(iptvobj)
         with write_lock:
             iptvdb.IPTVTbl.bulk_create(records, batch_size=10000)
             logger.debug(f"Added rows: {len(records)}")
             if st:
                 st.write(f"Added rows: {len(records)}")
-            rows_deleted = iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url << to_be_deleted).execute()
-            logger.debug(f"Deleted rows: {rows_deleted}")
-            if st:
-                st.write(f"Deleted rows: {rows_deleted}")
+        
+        rows_deleted = iptvdb.IPTVTbl.delete().where(iptvdb.IPTVTbl.url << to_be_deleted).execute()
+        logger.debug(f"Deleted rows: {rows_deleted}")
+        if st:
+            st.write(f"Deleted rows: {rows_deleted}")
         finish=currenttimemillis()
         logger.debug(f"Completed update of IPTVTbl in {finish-start}ms")
         if st:
@@ -406,7 +429,31 @@ def update_iptvdb_tbl(provider_m3u_base:str, provider_site:str, username:str, pa
         provider_object.last_updated=datetime.now()
         provider_object.save()
 
-def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:iptvdb.IPTVProviderTbl):
+def chunk_url_to_m3u(url_to_exp:dict,chunksize:int):
+    """This is an interator object that will produce chunksize items from the ext
+    that is an M3uPlaylist object
+
+    """
+    chunk=["#EXTM3U"]
+    keys = list(url_to_exp.keys())
+    for i in range(len(keys)):
+        # rebuild EXTINF and URL
+        if not ("series" in keys[i] or "movie" in keys[i]):
+            continue
+        chunk.append(url_to_exp[keys[i]])
+        chunk.append(keys[i])
+        if len(chunk)/2 > chunksize:
+            chunk_m3u = ipytv.playlist.loadl(chunk)
+            yield chunk_m3u
+            chunk=["#EXTM3U"]
+    if len(chunk) > 1:
+        chunk_m3u = ipytv.playlist.loadl(chunk)
+        yield chunk_m3u
+
+
+
+def create_iptvdbtbl_objects_threaded(media_map: dict, provider_object:iptvdb.IPTVProviderTbl,  provider_m3u_base:str, fetch_time:datetime):
+    """media_map is url>extinfo dictionary"""     
     mp = multiprocessing.Pool()
     input_items = []
     records = []
@@ -415,40 +462,27 @@ def create_iptvdbtbl_objects_threaded(media_list: M3UPlaylist, provider_object:i
     counter = 0
 
     def process_batch(batch):
-        results = mp.map(threaded_iptvobj_creator, [(item, provider_object) for item in batch])
+        results = mp.map(threaded_iptvobj_creator, [(item, provider_object, fetch_time) for item in batch])
         with write_lock:
             iptvdb.IPTVTbl.bulk_create(results, batch_size=10000)
         # return results
 
-    chunk=50000
+    chunksize=50000
     urls_processed=set()
-    for item in media_list:
-        if not ("series" in item.url or "movie" in item.url):
-            continue
-        if item.url in urls_processed:
-            continue
-        item:IPTVChannel
-        item.attributes
-        urls_processed.add(item.url)
-        input_items.append(item)
-        if len(input_items) == chunk:
-            counter+=1
-            logger.debug(f"Processing block: {counter * chunk}")
-            process_batch(input_items)
-            input_items = []
-
-    if input_items:
-        process_batch(input_items)
-
+    for m3u_playlist_chunk in chunk_url_to_m3u(media_map, chunksize):
+        counter+=1
+        logger.debug(f"Processing block: {counter * chunksize}")
+        process_batch(m3u_playlist_chunk)
+        
     finish = currenttimemillis()
     logger.debug(f"Threaded create and write IPTVTbl records took {finish - start}ms")
     return records
 
 def threaded_iptvobj_creator(args):
-    item, provider_object= args
+    item, provider_object, fetch_time= args
     provider_object:iptvdb.IPTVProviderTbl 
     iptvobj = iptvdb.IPTVTbl()
-    iptvobj.get_from_m3u_channel_object(item, provider_object)
+    iptvobj.get_from_m3u_channel_object(item, provider_object, fetch_time)
     # logger.debug(f"Created IPTVTbl object for {iptvobj.url}")
     return iptvobj
 
@@ -481,8 +515,15 @@ def download_large_file(target_file_name:str, url:str):
                 f.write(chunk)
 
 def download_regular_file(target_file_name:str, url:str):
-    resp = requests.get(url, headers={'User-Agent':"Chrome"},timeout=120)
-    resp.raise_for_status()
+
+    resp = dc.get(url, None)
+    if resp == None:
+        resp = requests.get(url, headers={'User-Agent':"Chrome"},timeout=120)
+        resp.raise_for_status()
+        dc.set(key=url,value= resp,expire=21600) # 6hours
+    else:
+        logger.debug(f"Returning cached response for {url}")
+
     with open(target_file_name, 'wb') as f:
         f.write(resp.content)
         print(f"finished")

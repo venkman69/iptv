@@ -1,4 +1,5 @@
 from configparser import ConfigParser
+from datetime import datetime
 import json
 from urllib.parse import urlparse
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
@@ -68,12 +69,12 @@ class IPTVTbl(BaseModel):
     logo = CharField(null=True) 
     added_date = DateTimeField(null=True)
 
-    def get_from_m3u_channel_object(self, channel_object:IPTVChannel, provider:IPTVProviderTbl):
+    def get_from_m3u_channel_object(self, channel_object:IPTVChannel, provider:IPTVProviderTbl, fetch_time:datetime):
         # self.provider_m3u_base = provider.provider_m3u_base
-        self.provider_m3u_base = channel_object.attributes.get("provider",None)
-        if self.provider_m3u_base == None:
-            raise ValueError(f"Provider not supplied")
-        self.added_date = channel_object.attributes.get("fetch_time",None)
+        self.provider_m3u_base = provider #channel_object.attributes.get("provider",None)
+        # if self.provider_m3u_base == None:
+        #     raise ValueError(f"Provider not supplied")
+        self.added_date = fetch_time
         #get provider object
         # parse the url and retrieve the filename from channel_object.url
         self.url = self.provider_m3u_base.tokenize_channel_url(channel_object.url)

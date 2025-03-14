@@ -37,6 +37,7 @@ log_dir = cfg["general"]["log_dir"]
 logger = utils.config_logger("iptv_downloader.log",Path(log_dir))
 logger.setLevel(logging.DEBUG)
 logging.getLogger("peewee").disabled=True
+logging.getLogger("watchdog.observers.inotify_buffer").disabled=True
 
 
 MOVIE_DOWNLOAD_PATH= cfg["general"]["movie_download_path"]
