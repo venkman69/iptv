@@ -3,7 +3,6 @@
 # after user selects a movie it can download the movie to a file
 
 from hashlib import sha256
-import hashlib
 from pathlib import Path
 import re
 import time
@@ -20,7 +19,6 @@ from streamlit_option_menu import option_menu   # pip install streamlit-option-m
 from streamlit_autorefresh import st_autorefresh
 import db.iptvdb as iptvdb
 from peewee import SqliteDatabase
-from playhouse.shortcuts import model_to_dict
 from datetime import datetime
 import logging
 
@@ -160,7 +158,8 @@ with tab_dl:
                     title = rec["original_title"].strip()
 
                 rec["title"] = title
-                rec["original_title"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
+                #rec["original_title"] = f"https://www.imdb.com/find/?q={title}&ref_=nv_sr_sm"
+                rec["original_title"] = f"https://www.google.com/search?q={title}"
                 redacted_filtered_media.append(rec)
             filtered_media_df = pd.DataFrame(redacted_filtered_media)
             filtered_media_df["Download"] = False
@@ -174,7 +173,7 @@ with tab_dl:
                                                               "url": None,
                                                               "logo": st.column_config.ImageColumn(),
                                                               "original_title":st.column_config.LinkColumn(disabled=True,
-                                                                                                          display_text=".*=(.*)&.*" 
+                                                                                                          display_text=".*q=(.*)" 
                                                                                                            ),
                                                               "group":st.column_config.Column(disabled=True),
                                                               "media_type":st.column_config.Column(disabled=True),
