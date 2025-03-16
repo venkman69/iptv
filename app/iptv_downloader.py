@@ -175,7 +175,7 @@ with tab_dl:
                                                               "url": None,
                                                               "logo": st.column_config.ImageColumn(width="small"),
                                                               "original_title":st.column_config.LinkColumn(disabled=True,
-                                                                                                          display_text=".*q=(.*)" ,width="small"
+                                                                                                          display_text=".*q=(.*)" ,width="medium"
                                                                                                            ),
                                                               "group":st.column_config.Column(disabled=True,width="small"),
                                                               "media_type":st.column_config.Column(disabled=True,width="small"),
