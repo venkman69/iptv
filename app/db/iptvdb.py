@@ -1,6 +1,7 @@
 from configparser import ConfigParser
 from datetime import datetime
 import json
+import re
 from urllib.parse import urlparse
 from peewee import (SqliteDatabase, BooleanField, CharField, DatabaseProxy, DateTimeField,
                     IntegerField, Model, Database, ForeignKeyField,
@@ -89,13 +90,28 @@ class IPTVTbl(BaseModel):
         else:
             self.media_type = "livetv"
         self.logo = channel_object.attributes.get("tvg-logo",None)
+
+    def sanitize_title(self,title):
+        # remove special characters from title
+        try:
+            if "-" == title[4] or "-" == title[3]:
+                title = title.split("-",1)[1].strip()
+                # remove any string starting with [ and ending with ]
+                title = re.sub(r'\[.*?\]', '', title).strip()
+        except Exception as e:
+            logger.error(f"title[4] is throwing exception {title}")
+        # only allow ascii characters
+        title = title.encode('ascii', 'ignore').decode()
+        title = title.lower()
+        return title
     
     def get_target_filename(self,cfg:ConfigParser):
         movie_path = cfg["general"]["movie_download_path"]
         series_path = cfg["general"]["series_download_path"]
         file_extn = self.url.split('.')[-1]
+        title = self.sanitize_title(self.title)
         if self.media_type == "movie":
-            target_file_name = Path(movie_path) / f"{self.title}.{file_extn}"
+            target_file_name = Path(movie_path) / f"{title}.{file_extn}"
         if self.media_type == "series":
             mnamer_settings =  setting_store.SettingStore()
             mnamer_object=target.Target(Path(f"{self.title}.{file_extn}"),mnamer_settings)

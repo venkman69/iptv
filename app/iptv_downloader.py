@@ -168,45 +168,62 @@ with tab_dl:
             filtered_media_df = filtered_media_df[cols]
 
             # st.write(filtered_media_df)
-            download_items_df = st.data_editor(filtered_media_df,
-                                               column_config={"Download": st.column_config.CheckboxColumn(default=False),
+            download_items = st.dataframe(filtered_media_df,
+            on_select="rerun",
+                selection_mode=["multi-row"],
+                                               column_config={"Download": None, #st.column_config.CheckboxColumn(default=False, width="small"),
                                                               "url": None,
-                                                              "logo": st.column_config.ImageColumn(),
+                                                              "logo": st.column_config.ImageColumn(width="small"),
                                                               "original_title":st.column_config.LinkColumn(disabled=True,
-                                                                                                          display_text=".*q=(.*)" 
+                                                                                                          display_text=".*q=(.*)" ,width="large"
                                                                                                            ),
-                                                              "group":st.column_config.Column(disabled=True),
-                                                              "media_type":st.column_config.Column(disabled=True),
+                                                              "group":st.column_config.Column(disabled=True,width="small"),
+                                                              "media_type":st.column_config.Column(disabled=True,width="small"),
                                                               "title":None
                                                },
                                                key="search_results")
-
-            selected_items = download_items_df[download_items_df["Download"] == True]
-            if selected_items.empty:
+            # download_items.selection
+            # get the selected items
+            if len(download_items.selection["rows"]) == 0:
                 st.write("No items selected")
             else:
+                # for item in download_items.selection["rows"]:
+                #     st.write(filtered_media_df.loc[item])
+
+            # selected_items = None # download_items_df[download_items_df["Download"] == True]
+            # if selected_items.empty:
+            #     st.write("No items selected")
+            # else:
+
                 if "selected_items_details" in st.session_state:
                     # then only fetch items that are missing
                     selected_items_details = st.session_state.selected_items_details
                 else:
                     selected_items_details = {}
                 details=[]
-                for item in selected_items.itertuples():
-                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.url)
-                    if item.url in selected_items_details:
-                        media_info:MyMediaInfo = selected_items_details[item.url]
+                iptv_objects=[]
+                for item in download_items.selection["rows"]:
+                    item_obj = filtered_media_df.loc[item]
+                    iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item_obj.url)
+                    iptv_objects.append(iptv_obj)
+                    if item_obj.url in selected_items_details:
+                        media_info:MyMediaInfo = selected_items_details[item_obj.url]
                     else:
-                        media_info:MyMediaInfo = utils.get_media_info(item.url)
-                        selected_items_details[item.url] = media_info
-                    rec={"title":item.title+" | "+str(iptv_obj.get_target_filename(cfg))}
+                        media_info:MyMediaInfo = utils.get_media_info(item_obj.url)
+                        selected_items_details[item_obj.url] = media_info
+                    # rec={"title":item_obj.title+" | "+str(iptv_obj.get_target_filename(cfg))}
+                    rec={"title":item_obj.title}
                     rec.update(media_info.to_dict())
                     details.append(rec)
                 st.session_state["selected_item_details"]=selected_items_details
                 show_details_df = pd.DataFrame(details)
-                st.data_editor(show_details_df)
+                details_selected_items = st.dataframe(show_details_df,
+                            on_select="rerun",
+                            selection_mode=["multi-row"],
+                                                      )
 
                 if st.button("Add selected items to download queue"):
-                    for item in selected_items.itertuples():
+                    for item in iptv_objects:
                         iptv_obj:iptvdb.IPTVTbl = iptvdb.IPTVTbl.get_or_none(iptvdb.IPTVTbl.url==item.url)
                         if iptv_obj:
                             created_date = datetime.now()
@@ -220,13 +237,13 @@ with tab_dl:
                     st.write("Submitted dl queue")
 
                     # del st.session_state[search_cache_key]
-                    selected_items = download_items_df[download_items_df["Download"] == True]
+                    # selected_items = download_items_df[download_items_df["Download"] == True]
                     # print(download_items_df)
-                    try:
-                        for row in selected_items.itertuples():
-                            row["Download"] = False
-                    except Exception as e:
-                        print(e)
+                    # try:
+                    #     for row in selected_items.itertuples():
+                    #         row["Download"] = False
+                    # except Exception as e:
+                    #     print(e)
 
         st.write("Enter a search title to filter the media list")
 
